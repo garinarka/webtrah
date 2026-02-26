@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\FamilyUnit;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -16,6 +17,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             UserSeeder::class,
+            // FamilyUnit::class,
+            PersonSeeder::class,
         ]);
 
         // User::factory(10)->create();
