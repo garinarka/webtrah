@@ -48,4 +48,9 @@ class Person extends Model
     {
         return $query->where('family_unit_id', $familyUnitId);
     }
+
+    public function approvals()
+    {
+        return $this->morphMany(Approval::class, 'approvable');
+    }
 }
