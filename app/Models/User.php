@@ -48,18 +48,8 @@ class User extends Authenticatable
     }
 
     // helper methods for role checking
-    public function isAdmin(): bool
+    public function hasAnyRole(array|string $roles): bool
     {
-        return $this->hasRole('admin');
-    }
-
-    public function isModerator(): bool
-    {
-        return $this->hasRole('moderator');
-    }
-
-    public function isUser(): bool
-    {
-        return $this->hasRole('user');
+        return $this->hasRole($roles);
     }
 }

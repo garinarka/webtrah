@@ -14,9 +14,15 @@ Route::get('/', function () {
     ]);
 });
 
-Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard', fn() => Inertia::render('Dashboard/Index'))->name('dashboard');
+    Route::get('/tree', fn() => Inertia::render('Tree/Index'))->name('tree');
+    Route::get('/people', fn() => Inertia::render('People/Index'))->name('people');
+
+    Route::middleware(['role:admin|moderator'])->group(function () {
+        Route::get('/approvals', fn() => Inertia::render('Approvals/Index'))->name('approvals');
+    });
+});
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -24,4 +30,4 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
