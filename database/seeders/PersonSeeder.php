@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Approval;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use App\Models\FamilyUnit;
@@ -50,6 +51,15 @@ class PersonSeeder extends Seeder
             'display_name' => 'Ahmad Wijaya (Paman)',
         ]);
 
+        $pendingPerson = Person::create([
+            'family_unit_id' => $family->id,
+            'created_by' => $admin->id,
+            'status' => 'draft',
+            'gender' => 'female',
+            'birth_date' => '1995-08-25',
+            'display_name' => 'Siti Aminah (Pending Approval)',
+        ]);
+
         // cucu
         Person::create([
             'family_unit_id' => $family->id,
@@ -77,6 +87,19 @@ class PersonSeeder extends Seeder
             'gender' => 'male',
             'birth_date' => '2020-03-10',
             'display_name' => 'Bayi Baru (Pending)',
+        ]);
+
+        Approval::create([
+            'approvable_type' => Person::class,
+            'approvable_id' => $pendingPerson->id,
+            'action' => 'create',
+            'changes' => [
+                'display_name' => ['old' => null, 'new' => 'Siti Aminah'],
+                'birth_date' => ['old' => null, 'new' => '1995-08-25'],
+                'gender' => ['old' => null, 'new' => 'female'],
+            ],
+            'status' => 'pending',
+            'requested_by' => $admin->id,
         ]);
     }
 }
