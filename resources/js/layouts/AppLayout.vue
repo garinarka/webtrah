@@ -20,6 +20,7 @@ onUnmounted(() => { window.removeEventListener('resize', ui.updateIsMobile); });
 const navigationItems = computed(() => {
     const items = [
         { name: 'Beranda', href: '/dashboard', icon: 'Home' },
+        { name: 'Anggota', href: '/people', icon: 'Users' },
         { name: 'Pohon', href: '/tree', icon: 'Tree' },
     ];
     if (auth.isModerator) items.push({ name: 'Persetujuan', href: '/approvals', icon: 'Clipboard', badge: 3 });

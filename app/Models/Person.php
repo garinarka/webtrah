@@ -1,0 +1,51 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Person extends Model
+{
+    use HasFactory, SoftDeletes, HasUuids;
+
+    protected $fillable = [
+        'family_unit_id',
+        'created_by',
+        'status',
+        'gender',
+        'birth_date',
+        'birth_accuracy',
+        'death_date',
+        'death_accuracy',
+        'display_name',
+    ];
+
+    protected $casts = [
+        'birth_date' => 'date',
+        'death_date' => 'date',
+    ];
+
+    public function familyUnit(): BelongsTo
+    {
+        return $this->belongsTo(FamilyUnit::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }
+
+    public function scopeInFamily($query, string $familyUnitId)
+    {
+        return $query->where('family_unit_id', $familyUnitId);
+    }
+}
