@@ -1,20 +1,5 @@
 <script setup>
-import Checkbox from '@/Components/Checkbox.vue';
-import GuestLayout from '@/Layouts/GuestLayout.vue';
-import InputError from '@/Components/InputError.vue';
-import InputLabel from '@/Components/InputLabel.vue';
-import PrimaryButton from '@/Components/PrimaryButton.vue';
-import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
-
-defineProps({
-    canResetPassword: {
-        type: Boolean,
-    },
-    status: {
-        type: String,
-    },
-});
+import { Head, useForm } from '@inertiajs/vue3';
 
 const form = useForm({
     email: '',
@@ -30,71 +15,31 @@ const submit = () => {
 </script>
 
 <template>
-    <GuestLayout>
-        <Head title="Log in" />
 
-        <div v-if="status" class="mb-4 text-sm font-medium text-green-600">
-            {{ status }}
+    <Head title="Log in" />
+    <div class="min-h-screen flex items-center justify-center bg-gray-50">
+        <div class="max-w-md w-full p-6 bg-white rounded-lg shadow">
+            <h2 class="text-2xl font-bold text-center text-gray-900">Masuk</h2>
+            <form @submit.prevent="submit" class="mt-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input v-model="form.email" type="email"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Password</label>
+                    <input v-model="form.password" type="password"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required />
+                </div>
+                <div class="flex items-center">
+                    <input v-model="form.remember" type="checkbox" class="rounded border-gray-300" />
+                    <label class="ml-2 text-sm text-gray-600">Ingat saya</label>
+                </div>
+                <button type="submit" class="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                    :disabled="form.processing">
+                    Masuk
+                </button>
+            </form>
         </div>
-
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="email" value="Email" />
-
-                <TextInput
-                    id="email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    v-model="form.email"
-                    required
-                    autofocus
-                    autocomplete="username"
-                />
-
-                <InputError class="mt-2" :message="form.errors.email" />
-            </div>
-
-            <div class="mt-4">
-                <InputLabel for="password" value="Password" />
-
-                <TextInput
-                    id="password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    v-model="form.password"
-                    required
-                    autocomplete="current-password"
-                />
-
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
-
-            <div class="mt-4 block">
-                <label class="flex items-center">
-                    <Checkbox name="remember" v-model:checked="form.remember" />
-                    <span class="ms-2 text-sm text-gray-600"
-                        >Remember me</span
-                    >
-                </label>
-            </div>
-
-            <div class="mt-4 flex items-center justify-end">
-                <Link
-                    v-if="canResetPassword"
-                    :href="route('password.request')"
-                    class="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                >
-                    Forgot your password?
-                </Link>
-
-                <PrimaryButton
-                    class="ms-4"
-                    :class="{ 'opacity-25': form.processing }"
-                    :disabled="form.processing"
-                >
-                    Log in
-                </PrimaryButton>
-            </div>
-        </form>
-    </GuestLayout>
+    </div>
 </template>
