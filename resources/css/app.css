@@ -1,3 +1,139 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================
+   SENIOR MODE - FONT SIZE SYSTEM
+   ============================================ */
+
+/* base: non-senior mode (tailwind default) */
+
+/* senior mode: normal (1 level up from default) */
+.senior-mode {
+    --text-xs: 0.875rem;
+    --text-sm: 1rem;
+    --text-base: 1.125rem;
+    --text-lg: 1.25rem;
+    --text-xl: 1.5rem;
+    --text-2xl: 1.875rem;
+
+    line-height: 1.7;
+}
+
+/* senior mode: large (2 levels up) */
+.senior-mode.font-size-large {
+    --text-xs: 1rem;
+    --text-sm: 1.125rem;
+    --text-base: 1.25rem;
+    --text-lg: 1.5rem;
+    --text-xl: 1.875rem;
+    --text-2xl: 2.25rem;
+
+    line-height: 1.8;
+}
+
+/* senior mode: xlarge (3 levels up) */
+.senior-mode.font-size-xlarge {
+    --text-xs: 1.125rem;
+    --text-sm: 1.25rem;
+    --text-base: 1.375rem;
+    --text-lg: 1.625rem;
+    --text-xl: 2rem;
+    --text-2xl: 2.5rem;
+
+    line-height: 1.9;
+}
+
+/* apply to all text classes */
+.senior-mode .text-xs,
+.senior-mode.text-xs {
+    font-size: var(--text-xs) !important;
+}
+
+.senior-mode .text-sm,
+.senior-mode.text-sm {
+    font-size: var(--text-sm) !important;
+}
+
+.senior-mode .text-base,
+.senior-mode.text-base {
+    font-size: var(--text-base) !important;
+}
+
+.senior-mode .text-lg,
+.senior-mode.text-lg {
+    font-size: var(--text-lg) !important;
+}
+
+.senior-mode .text-xl,
+.senior-mode.text-xl {
+    font-size: var(--text-xl) !important;
+}
+
+.senior-mode .text-2xl,
+.senior-mode.text-2xl {
+    font-size: var(--text-2xl) !important;
+}
+
+/* also apply to body and html */
+.senior-mode,
+.senior-mode body,
+.senior-mode html {
+    font-size: var(--text-base);
+}
+
+/* ============================================
+   HIGH CONTRAST
+   ============================================ */
+
+.high-contrast {
+    filter: contrast(1.3);
+}
+
+.high-contrast button,
+.high-contrast input,
+.high-contrast select,
+.high-contrast .bg-white {
+    border: 2px solid currentColor !important;
+}
+
+.high-contrast .text-gray-500,
+.high-contrast .text-gray-400 {
+    color: #000 !important;
+}
+
+/* ============================================
+   REDUCED MOTION
+   ============================================ */
+
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+}
+
+/* ============================================
+   TOUCH TARGETS (senior mode)
+   ============================================ */
+
+.senior-mode button,
+.senior-mode [role="button"],
+.senior-mode input,
+.senior-mode select,
+.senior-mode a {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+.senior-mode.font-size-large button,
+.senior-mode.font-size-large [role="button"] {
+    min-height: 48px;
+}
+
+.senior-mode.font-size-xlarge button,
+.senior-mode.font-size-xlarge [role="button"] {
+    min-height: 56px;
+}
