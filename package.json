@@ -20,6 +20,7 @@
     },
     "dependencies": {
         "@phosphor-icons/vue": "^2.2.1",
+        "d3": "^7.9.0",
         "pinia": "^3.0.4",
         "ziggy-js": "^2.6.1"
     }

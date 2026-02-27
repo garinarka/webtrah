@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\TreeController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -36,6 +37,11 @@ Route::middleware(['auth', 'verified', 'role:admin|moderator'])->group(function 
     Route::get('/approvals/{approval}', [ApprovalController::class, 'show'])->name('approvals.show');
     Route::post('/approvals/{approval}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approvals.reject');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/tree', [TreeController::class, 'index'])->name('tree');
+    Route::get('/api/tree/data', [TreeController::class, 'data'])->name('tree.data');
 });
 
 Route::middleware('auth')->group(function () {
