@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use App\Models\FamilyUnit;
 use App\Models\Person;
 use App\Models\User;
+use App\Models\Relationship;
 
 class PersonSeeder extends Seeder
 {
@@ -100,6 +101,46 @@ class PersonSeeder extends Seeder
             ],
             'status' => 'pending',
             'requested_by' => $admin->id,
+        ]);
+
+        // kakek -> bapak
+        Relationship::create([
+            'subject_id' => $kakek->id,
+            'object_id' => $bapak->id,
+            'type' => 'parent',
+            'status' => 'approved',
+            'is_biological' => true,
+            'created_by' => $admin->id,
+        ]);
+
+        // kakek -> paman
+        Relationship::create([
+            'subject_id' => $kakek->id,
+            'object_id' => $paman->id,
+            'type' => 'parent',
+            'status' => 'approved',
+            'is_biological' => true,
+            'created_by' => $admin->id,
+        ]);
+
+        // bapak -> andi
+        Relationship::create([
+            'subject_id' => $bapak->id,
+            'object_id' => Person::where('display_name', 'like', '%Andi%')->first()->id,
+            'type' => 'parent',
+            'status' => 'approved',
+            'is_biological' => true,
+            'created_by' => $admin->id,
+        ]);
+
+        // bapak -> ani
+        Relationship::create([
+            'subject_id' => $bapak->id,
+            'object_id' => Person::where('display_name', 'like', '%Ani%')->first()->id,
+            'type' => 'parent',
+            'status' => 'approved',
+            'is_biological' => true,
+            'created_by' => $admin->id,
         ]);
     }
 }
