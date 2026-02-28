@@ -2,9 +2,9 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
-
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\RelationshipController;
 use App\Http\Controllers\TreeController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +29,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/people/bulk-destroy',   [PersonController::class, 'bulkDestroy'])->name('people.bulk-destroy');
 
     Route::resource('people', PersonController::class);
+
+    // relationships
+    Route::post('/relationships',                        [RelationshipController::class, 'store'])->name('relationships.store');
+    Route::delete('/relationships/{relationship}',       [RelationshipController::class, 'destroy'])->name('relationships.destroy');
+    Route::post('/relationships/{relationship}/approve', [RelationshipController::class, 'approve'])->name('relationships.approve');
 
     // tree
     Route::get('/tree',          [TreeController::class, 'index'])->name('tree');

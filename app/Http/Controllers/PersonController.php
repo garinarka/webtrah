@@ -16,7 +16,7 @@ use Inertia\Inertia;
 class PersonController extends Controller
 {
     use AuthorizesRequests;
-    
+
     // ─── LIST ──────────────────────────────────────────────────────────────
 
     public function index(Request $request)
@@ -70,14 +70,73 @@ class PersonController extends Controller
             ->limit(20)
             ->get();
 
+        // relasi — semua yang approved (aktif) maupun pending (untuk ditampilkan ke admin/mod)
         $user = auth()->user();
 
+        $relationshipsRaw = \App\Models\Relationship::with(['subject:id,display_name,gender,birth_date', 'object:id,display_name,gender,birth_date'])
+            ->where(fn($q) => $q->where('subject_id', $person->id)->orWhere('object_id', $person->id))
+            ->whereIn('status', ['approved', 'pending'])
+            ->whereNull('ended_at')
+            ->orderBy('type')
+            ->get();
+
+        // kelompokkan jadi parents, children, spouses dari sudut pandang person ini
+        $parents   = [];
+        $children  = [];
+        $spouses   = [];
+        $pending   = [];
+
+        foreach ($relationshipsRaw as $rel) {
+            $entry = [
+                'id'           => $rel->id,
+                'type'         => $rel->type,
+                'is_biological' => $rel->is_biological,
+                'status'       => $rel->status,
+                'started_at'   => $rel->started_at?->toDateString(),
+                'ended_at'     => $rel->ended_at?->toDateString(),
+                'ended_reason' => $rel->ended_reason,
+            ];
+
+            if ($rel->status === 'pending') {
+                // tampilkan pending hanya ke admin/moderator
+                if ($user->isAdmin() || $user->isModerator()) {
+                    $related = $rel->subject_id === $person->id ? $rel->object : $rel->subject;
+                    $pending[] = array_merge($entry, ['person' => $related]);
+                }
+                continue;
+            }
+
+            // approved — kelompokkan berdasarkan type & posisi
+            if (in_array($rel->type, ['parent', 'step_parent', 'adopted_parent'])) {
+                if ($rel->object_id === $person->id) {
+                    // subject adalah orang tua dari person ini
+                    $parents[] = array_merge($entry, ['person' => $rel->subject]);
+                } else {
+                    // person ini adalah orang tua dari object
+                    $children[] = array_merge($entry, ['person' => $rel->object]);
+                }
+            } elseif ($rel->type === 'spouse') {
+                $related   = $rel->subject_id === $person->id ? $rel->object : $rel->subject;
+                $spouses[] = array_merge($entry, ['person' => $related]);
+            }
+        }
+
+        // daftar semua orang aktif untuk dropdown tambah relasi
+        $peoplelist = Person::where('id', '!=', $person->id)
+            ->where('status', 'active')
+            ->orderBy('display_name')
+            ->get(['id', 'display_name', 'gender', 'birth_date']);
+
         return Inertia::render('People/Show', [
-            'person'    => $person->load(['familyUnit', 'creator']),
-            'auditLogs' => $auditLogs,
-            'can'       => [
-                'edit'   => $user->can('update', $person),
-                'delete' => $user->can('delete', $person),
+            'person'      => $person->load(['familyUnit', 'creator']),
+            'auditLogs'   => $auditLogs,
+            'relationships' => compact('parents', 'children', 'spouses', 'pending'),
+            'peopleList'  => $peoplelist,
+            'can'         => [
+                'edit'              => $user->can('update', $person),
+                'delete'            => $user->can('delete', $person),
+                'manage_relations'  => $user->isAdmin() || $user->isModerator(),
+                'approve_relations' => $user->isAdmin(),
             ],
         ]);
     }

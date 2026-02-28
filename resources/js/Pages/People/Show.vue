@@ -2,10 +2,13 @@
 import { ref } from 'vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
+import RelationshipsPanel from './Partials/RelationshipsPanel.vue';
 
 const props = defineProps({
     person: Object,
     auditLogs: { type: Array, default: () => [] },
+    relationships: { type: Object, default: () => ({ parents: [], children: [], spouses: [], pending: [] }) },
+    peopleList: { type: Array, default: () => [] },
     can: Object,
 });
 
@@ -212,13 +215,18 @@ const eventColor = (event) => ({
                             <dd class="mt-1 text-sm text-gray-900">
                                 {{ new Date(person.created_at).toLocaleDateString('id-ID', {
                                     year: 'numeric', month:
-                                'long', day: 'numeric' })
+                                        'long', day: 'numeric'
+                                })
                                 }}
                             </dd>
                         </div>
                     </dl>
                 </div>
             </div>
+
+            <!-- relationships panel -->
+            <RelationshipsPanel :person-id="person.id" :relationships="relationships" :people-list="peopleList"
+                :can="can" />
 
             <!-- audit log -->
             <div v-if="auditLogs.length > 0" class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
