@@ -24,14 +24,14 @@ class Relationship extends Model
         'status',
         'approved_by',
         'approved_at',
-        'created_by'
+        'created_by',
     ];
 
     protected $casts = [
-        'started_at' => 'date',
-        'ended_at' => 'date',
+        'started_at'  => 'date',
+        'ended_at'    => 'date',
         'is_biological' => 'boolean',
-        'metadata' => 'array',
+        'metadata'    => 'array',
         'approved_at' => 'datetime',
     ];
 
@@ -43,5 +43,35 @@ class Relationship extends Model
     public function object(): BelongsTo
     {
         return $this->belongsTo(Person::class, 'object_id');
+    }
+
+    public function spouseUnit(): BelongsTo
+    {
+        return $this->belongsTo(SpouseUnit::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    // ── HELPERS ────────────────────────────────────────────────────────────
+
+    public function typeLabel(): string
+    {
+        return [
+            'parent'          => 'Orang Tua',
+            'child'           => 'Anak',
+            'spouse'          => 'Pasangan',
+            'step_parent'     => 'Orang Tua Tiri',
+            'step_child'      => 'Anak Tiri',
+            'adopted_parent'  => 'Orang Tua Angkat',
+            'adopted_child'   => 'Anak Angkat',
+        ][$this->type] ?? $this->type;
     }
 }

@@ -33,7 +33,7 @@ const eventColor = (event) => ({
     <Head :title="`Edit: ${person.display_name}`" />
     <AppLayout>
         <div class="max-w-5xl mx-auto">
-            <!-- Page header -->
+            <!-- page header -->
             <div class="mb-8">
                 <nav class="flex items-center gap-2 text-sm text-gray-500 mb-3">
                     <Link href="/people" class="hover:text-indigo-600 transition-colors">Daftar Anggota</Link>
@@ -64,7 +64,7 @@ const eventColor = (event) => ({
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Main form (2/3) -->
+                <!-- main form (2/3) -->
                 <div class="lg:col-span-2">
                     <PersonFormWizard :initial-data="{
                         ...person,
@@ -74,7 +74,7 @@ const eventColor = (event) => ({
                         :submit-route="`/people/${person.id}`" submit-method="patch" />
                 </div>
 
-                <!-- Audit Log Sidebar (1/3) -->
+                <!-- audit log sidebar (1/3) -->
                 <div class="lg:col-span-1">
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <h3 class="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -92,7 +92,7 @@ const eventColor = (event) => ({
                         <div v-else class="space-y-3">
                             <div v-for="log in auditLogs" :key="log.id"
                                 class="flex gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                                <!-- Event badge -->
+                                <!-- event badge -->
                                 <div class="flex-shrink-0 mt-0.5">
                                     <span :class="['px-1.5 py-0.5 text-xs font-medium rounded', eventColor(log.event)]">
                                         {{ eventLabel(log.event) }}
