@@ -21,13 +21,18 @@ onMounted(() => { preferences.loadFromStorage(); window.addEventListener('resize
 onUnmounted(() => { window.removeEventListener('resize', ui.updateIsMobile); });
 
 const navigationItems = computed(() => {
+    const pendingCount = page.props.pendingApprovalsCount ?? 0;
     const items = [
         { name: 'Beranda', href: '/dashboard', icon: 'Home' },
         { name: 'Anggota', href: '/people', icon: 'Users' },
         { name: 'Pohon', href: '/tree', icon: 'Tree' },
     ];
-    if (auth.isModerator) items.push({ name: 'Persetujuan', href: '/approvals', icon: 'Clipboard', badge: 3 });
-    if (auth.isAdmin) items.push({ name: 'Laporan', href: '/reports', icon: 'Chart' });
+    if (auth.isModerator) items.push({
+        name: 'Persetujuan',
+        href: '/approvals',
+        icon: 'Clipboard',
+        badge: pendingCount > 0 ? pendingCount : null,
+    });
     return items;
 });
 

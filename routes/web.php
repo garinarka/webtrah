@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\TreeController;
@@ -10,43 +12,39 @@ use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
+        'canLogin'       => Route::has('login'),
+        'canRegister'    => Route::has('register'),
         'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
+        'phpVersion'     => PHP_VERSION,
     ]);
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', fn() => Inertia::render('Dashboard/Index'))->name('dashboard');
-    Route::get('/tree', fn() => Inertia::render('Tree/Index'))->name('tree');
-    Route::get('/people', fn() => Inertia::render('People/Index'))->name('people');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::middleware(['role:admin|moderator'])->group(function () {
-        Route::get('/approvals', fn() => Inertia::render('Approvals/Index'))->name('approvals');
-    });
-});
+    // people — draft & duplicate harus didaftarkan SEBELUM resource agar tidak bertabrakan dengan {person}
+    Route::post('/people/draft/save',       [PersonController::class, 'saveDraft'])->name('people.draft.save');
+    Route::delete('/people/draft/clear',    [PersonController::class, 'clearDraft'])->name('people.draft.clear');
+    Route::post('/people/check-duplicates', [PersonController::class, 'checkDuplicates'])->name('people.check-duplicates');
+    Route::delete('/people/bulk-destroy',   [PersonController::class, 'bulkDestroy'])->name('people.bulk-destroy');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/people', [PersonController::class, 'index'])->name('people.index');
-    Route::get('/people/{person}', [PersonController::class, 'show'])->name('people.show');
-});
+    Route::resource('people', PersonController::class);
 
-Route::middleware(['auth', 'verified', 'role:admin|moderator'])->group(function () {
-    Route::get('/approvals', [ApprovalController::class, 'index'])->name('approvals.index');
-    Route::get('/approvals/{approval}', [ApprovalController::class, 'show'])->name('approvals.show');
-    Route::post('/approvals/{approval}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
-    Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approvals.reject');
-});
-
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/tree', [TreeController::class, 'index'])->name('tree');
+    // tree
+    Route::get('/tree',          [TreeController::class, 'index'])->name('tree');
     Route::get('/api/tree/data', [TreeController::class, 'data'])->name('tree.data');
 });
 
+Route::middleware(['auth', 'verified', 'role:admin|moderator'])->group(function () {
+    Route::get('/approvals',                          [ApprovalController::class, 'index'])->name('approvals.index');
+    Route::get('/approvals/{approval}',               [ApprovalController::class, 'show'])->name('approvals.show');
+    Route::post('/approvals/{approval}/approve',      [ApprovalController::class, 'approve'])->name('approvals.approve');
+    Route::post('/approvals/{approval}/reject',       [ApprovalController::class, 'reject'])->name('approvals.reject');
+});
+
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::get('/profile',    [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile',  [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
