@@ -50,9 +50,9 @@ function toggle() {
 
         <!-- main fab -->
         <button @click="toggle"
-            class="w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg flex items-center justify-center text-3xl hover:bg-indigo-700 transition-all"
+            class="w-14 h-14 rounded-full bg-indigo-600 text-white shadow-lg flex items-center justify-center text-4xl hover:bg-indigo-700 transition-all"
             :class="{ 'rotate-45': isExpanded }">
-            {{ isExpanded ? '×' : '+' }}
+            {{ '+' }}
         </button>
     </div>
 </template>

@@ -35,16 +35,20 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $user ? [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->roles->first()?->name,
+                    'id'          => $user->id,
+                    'name'        => $user->name,
+                    'email'       => $user->email,
+                    'role'        => $user->roles->first()?->name,
                     'permissions' => $user->getPermissionNames(),
                 ] : null,
             ],
+            // jumlah approval pending — dibaca sekali per request, dipakai sidebar & widget
+            'pendingApprovalsCount' => fn() => $user && ($user->isAdmin() || $user->isModerator())
+                ? \App\Models\Approval::where('status', 'pending')->count()
+                : 0,
             'flash' => [
                 'message' => fn() => $request->session()->get('message'),
-                'error' => fn() => $request->session()->get('error'),
+                'error'   => fn() => $request->session()->get('error'),
             ],
         ];
     }
