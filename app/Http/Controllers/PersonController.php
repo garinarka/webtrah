@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\Approval;
 use App\Models\FamilyUnit;
 use App\Models\Person;
+use App\Services\NotificationService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +18,7 @@ class PersonController extends Controller
 {
     use AuthorizesRequests;
 
-    // ─── LIST ──────────────────────────────────────────────────────────────
+    // LIST
 
     public function index(Request $request)
     {
@@ -57,7 +58,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // ─── SHOW ──────────────────────────────────────────────────────────────
+    // SHOW
 
     public function show(Person $person)
     {
@@ -141,7 +142,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // ─── CREATE FORM ───────────────────────────────────────────────────────
+    // CREATE FORM
 
     public function create()
     {
@@ -157,7 +158,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // ─── STORE ─────────────────────────────────────────────────────────────
+    // STORE
 
     public function store(StorePersonRequest $request)
     {
@@ -189,7 +190,7 @@ class PersonController extends Controller
 
             // buat approval request hanya jika bukan admin dan bukan draft
             if (!$user->isAdmin() && !$isDraft) {
-                Approval::create([
+                $approval = Approval::create([
                     'approvable_type' => Person::class,
                     'approvable_id'   => $person->id,
                     'action'          => 'create',
@@ -204,6 +205,7 @@ class PersonController extends Controller
                     'status'       => 'pending',
                     'requested_by' => $user->id,
                 ]);
+                NotificationService::notifyAdminsOfNewApproval($approval->load(['approvable', 'requester']));
             }
 
             AuditLog::record($person, $isDraft ? 'draft_saved' : 'created', [], [
@@ -230,7 +232,7 @@ class PersonController extends Controller
         }
     }
 
-    // ─── EDIT FORM ─────────────────────────────────────────────────────────
+    // EDIT FORM
 
     public function edit(Person $person)
     {
@@ -251,7 +253,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // ─── UPDATE ────────────────────────────────────────────────────────────
+    // UPDATE
 
     public function update(UpdatePersonRequest $request, Person $person)
     {
@@ -288,7 +290,7 @@ class PersonController extends Controller
                 $message = 'Data anggota berhasil diperbarui.';
             } else {
                 // moderator & user: buat approval request, data tidak langsung berubah
-                Approval::create([
+                $approval = Approval::create([
                     'approvable_type' => Person::class,
                     'approvable_id'   => $person->id,
                     'action'          => 'update',
@@ -297,6 +299,7 @@ class PersonController extends Controller
                     'requested_by'    => $user->id,
                 ]);
                 AuditLog::record($person, 'update_requested', $oldValues, array_map(fn($c) => $c['new'], $changes));
+                NotificationService::notifyAdminsOfNewApproval($approval->load(['approvable', 'requester']));
                 $message = 'Permintaan perubahan diajukan dan menunggu persetujuan admin.';
             }
 
@@ -308,7 +311,7 @@ class PersonController extends Controller
         }
     }
 
-    // ─── DELETE ────────────────────────────────────────────────────────────
+    // DELETE
 
     public function destroy(Request $request, Person $person)
     {
@@ -332,7 +335,7 @@ class PersonController extends Controller
                 return redirect()->route('people.index')->with('message', 'Anggota berhasil dihapus.');
             } else {
                 // moderator: ajukan penghapusan, tunggu persetujuan admin
-                Approval::create([
+                $approval = Approval::create([
                     'approvable_type' => Person::class,
                     'approvable_id'   => $person->id,
                     'action'          => 'delete',
@@ -341,6 +344,7 @@ class PersonController extends Controller
                     'requested_by'    => $user->id,
                 ]);
                 AuditLog::record($person, 'delete_requested', $oldValues, ['reason' => $request->reason]);
+                NotificationService::notifyAdminsOfNewApproval($approval->load(['approvable', 'requester']));
                 DB::commit();
                 return redirect()->route('people.index')->with('message', 'Permintaan penghapusan diajukan dan menunggu persetujuan admin.');
             }
@@ -350,7 +354,7 @@ class PersonController extends Controller
         }
     }
 
-    // ─── BULK DELETE ───────────────────────────────────────────────────────
+    // BULK DELETE
 
     public function bulkDestroy(Request $request)
     {
@@ -410,7 +414,7 @@ class PersonController extends Controller
         }
     }
 
-    // ─── DRAFT AUTO-SAVE ───────────────────────────────────────────────────
+    // DRAFT AUTO-SAVE
 
     public function saveDraft(Request $request)
     {
@@ -436,7 +440,7 @@ class PersonController extends Controller
         return response()->json(['cleared' => true]);
     }
 
-    // ─── DUPLICATE DETECTION ───────────────────────────────────────────────
+    // DUPLICATE DETECTION
 
     public function checkDuplicates(Request $request)
     {

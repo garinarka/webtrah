@@ -14,21 +14,21 @@ const formatDate = (iso) => {
 };
 
 const eventLabel = (event) => ({
-    created:          'Dibuat',
-    updated:          'Diperbarui',
-    draft_saved:      'Draft',
+    created: 'Dibuat',
+    updated: 'Diperbarui',
+    draft_saved: 'Draft',
     delete_requested: 'Hapus Diminta',
     update_requested: 'Ubah Diminta',
-    deleted:          'Dihapus',
+    deleted: 'Dihapus',
 }[event] ?? event);
 
 const eventColor = (event) => ({
-    created:          'bg-green-100 text-green-700',
-    updated:          'bg-blue-100 text-blue-700',
-    draft_saved:      'bg-gray-100 text-gray-600',
+    created: 'bg-green-100 text-green-700',
+    updated: 'bg-blue-100 text-blue-700',
+    draft_saved: 'bg-gray-100 text-gray-600',
     delete_requested: 'bg-red-100 text-red-700',
     update_requested: 'bg-amber-100 text-amber-700',
-    deleted:          'bg-red-200 text-red-800',
+    deleted: 'bg-red-200 text-red-800',
 }[event] ?? 'bg-gray-100 text-gray-600');
 
 const actionLabel = (action) => ({
@@ -73,6 +73,7 @@ const statCards = [
 </script>
 
 <template>
+
     <div class="space-y-6">
         <!-- header -->
         <div>
@@ -82,18 +83,14 @@ const statCards = [
 
         <!-- stat cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <component
-                :is="card.href ? 'a' : 'div'"
-                v-for="card in statCards"
-                :key="card.key"
-                :href="card.href ?? undefined"
-                :class="[
+            <component :is="card.href ? 'a' : 'div'" v-for="card in statCards" :key="card.key"
+                :href="card.href ?? undefined" :class="[
                     'bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex items-start gap-4',
                     card.href ? 'hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer' : '',
-                ]"
-            >
+                ]">
                 <div :class="['w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0', card.bg]">
-                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="1.8">
                         <path stroke-linecap="round" stroke-linejoin="round" :d="card.icon" />
                     </svg>
                 </div>
@@ -125,7 +122,7 @@ const statCards = [
                     class="flex flex-col items-center justify-center py-10 text-gray-400">
                     <svg class="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <p class="text-sm">Tidak ada antrian</p>
                 </div>
@@ -137,8 +134,8 @@ const statCards = [
                             <span :class="[
                                 'px-2 py-0.5 rounded text-xs font-medium flex-shrink-0',
                                 approval.action === 'create' ? 'bg-green-100 text-green-700' :
-                                approval.action === 'update' ? 'bg-blue-100 text-blue-700' :
-                                                               'bg-red-100 text-red-700'
+                                    approval.action === 'update' ? 'bg-blue-100 text-blue-700' :
+                                        'bg-red-100 text-red-700'
                             ]">
                                 {{ actionLabel(approval.action) }}
                             </span>
@@ -166,9 +163,9 @@ const statCards = [
                 </div>
 
                 <ul v-else class="divide-y divide-gray-50">
-                    <li v-for="log in stats.recent_activity" :key="log.id"
-                        class="flex items-start gap-3 px-5 py-3">
-                        <span :class="['px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 mt-0.5', eventColor(log.event)]">
+                    <li v-for="log in stats.recent_activity" :key="log.id" class="flex items-start gap-3 px-5 py-3">
+                        <span
+                            :class="['px-2 py-0.5 rounded text-xs font-medium flex-shrink-0 mt-0.5', eventColor(log.event)]">
                             {{ eventLabel(log.event) }}
                         </span>
                         <div class="flex-1 min-w-0">
@@ -190,7 +187,8 @@ const statCards = [
                 <Link href="/approvals"
                     class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Tinjau Approval
                     <span v-if="stats.pending_count > 0"
@@ -201,21 +199,22 @@ const statCards = [
                 <Link href="/people/create"
                     class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
                     Tambah Anggota
                 </Link>
                 <Link href="/people"
                     class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     Daftar Anggota
                 </Link>
                 <Link href="/tree"
                     class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                     </svg>
                     Pohon Keluarga
                 </Link>

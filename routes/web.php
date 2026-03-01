@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ApprovalController;
@@ -20,6 +21,11 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    // notifications
+    Route::get('/notifications',              [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{id}/read',   [NotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/read-all',    [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // people — draft & duplicate harus didaftarkan sebelum resource agar tidak bertabrakan dengan {person}
