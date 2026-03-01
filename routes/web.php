@@ -22,7 +22,7 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // people — draft & duplicate harus didaftarkan SEBELUM resource agar tidak bertabrakan dengan {person}
+    // people — draft & duplicate harus didaftarkan sebelum resource agar tidak bertabrakan dengan {person}
     Route::post('/people/draft/save',       [PersonController::class, 'saveDraft'])->name('people.draft.save');
     Route::delete('/people/draft/clear',    [PersonController::class, 'clearDraft'])->name('people.draft.clear');
     Route::post('/people/check-duplicates', [PersonController::class, 'checkDuplicates'])->name('people.check-duplicates');
@@ -36,8 +36,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/relationships/{relationship}/approve', [RelationshipController::class, 'approve'])->name('relationships.approve');
 
     // tree
-    Route::get('/tree',          [TreeController::class, 'index'])->name('tree');
-    Route::get('/api/tree/data', [TreeController::class, 'data'])->name('tree.data');
+    Route::get('/tree',              [TreeController::class, 'index'])->name('tree');
+    Route::get('/api/tree/data',     [TreeController::class, 'data'])->name('tree.data');
+    Route::get('/api/tree/search',   [TreeController::class, 'searchPeople'])->name('tree.search');
 });
 
 Route::middleware(['auth', 'verified', 'role:admin|moderator'])->group(function () {
