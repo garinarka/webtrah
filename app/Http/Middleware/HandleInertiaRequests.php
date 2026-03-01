@@ -42,9 +42,13 @@ class HandleInertiaRequests extends Middleware
                     'permissions' => $user->getPermissionNames(),
                 ] : null,
             ],
-            // jumlah approval pending — dibaca sekali per request, dipakai sidebar & widget
+            // junlah approval pending — dibaca sekali per request, dipakai sidebar & widget
             'pendingApprovalsCount' => fn() => $user && ($user->isAdmin() || $user->isModerator())
                 ? \App\Models\Approval::where('status', 'pending')->count()
+                : 0,
+            // unread notifications count untuk bell icon
+            'unreadNotificationsCount' => fn() => $user
+                ? $user->unreadNotifications()->count()
                 : 0,
             'flash' => [
                 'message' => fn() => $request->session()->get('message'),

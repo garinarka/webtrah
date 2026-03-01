@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Person;
 use App\Models\Relationship;
 use App\Models\SpouseUnit;
+use App\Services\NotificationService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +20,11 @@ class RelationshipController extends Controller
      * simpan relasi baru.
      *
      * logika mapping type:
-     *  - jika user memilih "parent"  → subject = related, object = person  (related adalah orang tua dari person)
-     *  - jika user memilih "child"   → subject = person, object = related  (person adalah orang tua dari related)
-     *  - jika user memilih "spouse"  → subject = person, object = related  (simetris)
-     *  - step_parent / adopted_parent → sama dengan parent
-     *  - step_child  / adopted_child  → sama dengan child
+     *  - jika user memilih "parent"  -> subject = related, object = person  (related adalah orang tua dari person)
+     *  - jika user memilih "child"   -> subject = person, object = related  (person adalah orang tua dari related)
+     *  - jika user memilih "spouse"  -> subject = person, object = related  (simetris)
+     *  - step_parent / adopted_parent -> sama dengan parent
+     *  - step_child  / adopted_child  -> sama dengan child
      */
     public function store(StoreRelationshipRequest $request)
     {
@@ -70,7 +71,7 @@ class RelationshipController extends Controller
                 $spouseUnitId = $spouseUnit->id;
             }
 
-            // admin → langsung approved, moderator → pending
+            // admin -> langsung approved, moderator -> pending
             $status = $user->isAdmin() ? 'approved' : 'pending';
 
             $relationship = Relationship::create([
@@ -101,6 +102,24 @@ class RelationshipController extends Controller
             $message = $user->isAdmin()
                 ? 'Relasi berhasil ditambahkan.'
                 : 'Relasi diajukan dan menunggu persetujuan admin.';
+
+            // jika pending, notifikasi ke admin
+            if ($status === 'pending') {
+                // buat approval record untuk relasi juga agar bisa di-notif
+                $approval = \App\Models\Approval::create([
+                    'approvable_type' => Relationship::class,
+                    'approvable_id'   => $relationship->id,
+                    'action'          => 'create',
+                    'changes'         => [
+                        'type'        => ['old' => null, 'new' => $storedType],
+                        'subject_id'  => ['old' => null, 'new' => $subjectId],
+                        'object_id'   => ['old' => null, 'new' => $objectId],
+                    ],
+                    'status'       => 'pending',
+                    'requested_by' => $user->id,
+                ]);
+                NotificationService::notifyAdminsOfNewApproval($approval->load('requester'));
+            }
 
             return back()->with('message', $message);
         } catch (\Throwable $e) {

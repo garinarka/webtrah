@@ -2,61 +2,37 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Approval;
 use App\Models\Person;
+use App\Models\User;
+use App\Notifications\ApprovalDecided;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ApprovalController extends Controller
 {
     use AuthorizesRequests;
 
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $query = Approval::with(['approvable', 'requester'])
             ->where('status', 'pending')
             ->orderBy('created_at', 'desc');
 
-        if ($request->user()->isModerator() && !$request->user()->isAdmin()) {
-            $query->whereHas('approvable', function ($q) use ($request) {
-                $q->where('family_unit_id', $request->user()->family_unit_id);
-            });
-        }
-
-        $approvals = $query->paginate(10);
+        // moderator hanya lihat semua pending (family_unit_id tidak ada di users)
+        // admin lihat semua
+        $approvals = $query->paginate(15);
 
         return Inertia::render('Approvals/Index', [
             'approvals' => $approvals,
-            'can' => [
+            'can'       => [
                 'approve' => $request->user()->can('approve_changes'),
-                'reject' => $request->user()->can('reject_changes'),
-            ]
+                'reject'  => $request->user()->can('reject_changes'),
+            ],
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
     public function show(Approval $approval)
     {
         $this->authorize('view', $approval);
@@ -65,11 +41,11 @@ class ApprovalController extends Controller
 
         return Inertia::render('Approvals/Show', [
             'approval' => $approval->load(['approvable', 'requester', 'approver']),
-            'diff' => $this->formatDiff($approval),
-            'can' => [
+            'diff'     => $this->formatDiff($approval),
+            'can'      => [
                 'approve' => $user->can('approve', $approval),
-                'reject' => $user->can('reject', $approval),
-            ]
+                'reject'  => $user->can('reject', $approval),
+            ],
         ]);
     }
 
@@ -81,6 +57,7 @@ class ApprovalController extends Controller
             'confirmation' => 'required|in:SETUJU',
         ]);
 
+        // terapkan perubahan sesuai action
         if ($approval->action === 'create') {
             $approval->approvable->update(['status' => 'active']);
         } elseif ($approval->action === 'update') {
@@ -93,12 +70,19 @@ class ApprovalController extends Controller
         }
 
         $approval->update([
-            'status' => 'approved',
+            'status'      => 'approved',
             'approved_by' => auth()->id(),
             'approved_at' => now(),
         ]);
 
-        return redirect()->route('approvals.index')->with('message', 'Perubahan disetujui');
+        // notifikasi ke requester
+        $requester = $approval->requester;
+        if ($requester) {
+            $requester->notify(new ApprovalDecided($approval->fresh(['approvable', 'approver']), 'approved'));
+        }
+
+        return redirect()->route('approvals.index')
+            ->with('message', 'Perubahan berhasil disetujui.');
     }
 
     public function reject(Request $request, Approval $approval)
@@ -110,24 +94,33 @@ class ApprovalController extends Controller
         ]);
 
         $approval->update([
-            'status' => 'rejected',
-            'approved_by' => auth()->id(),
-            'approved_at' => now(),
+            'status'           => 'rejected',
+            'approved_by'      => auth()->id(),
+            'approved_at'      => now(),
             'rejection_reason' => $request->reason,
         ]);
 
-        return redirect()->route('approvals.index')->with('message', 'Perubahan ditolak');
+        // notifikasi ke requester
+        $requester = $approval->requester;
+        if ($requester) {
+            $requester->notify(new ApprovalDecided($approval->fresh(['approvable', 'approver']), 'rejected', $request->reason));
+        }
+
+        return redirect()->route('approvals.index')
+            ->with('message', 'Perubahan ditolak.');
     }
 
+    // HELPERS
+    
     private function formatDiff(Approval $approval): array
     {
         $diff = [];
-        foreach ($approval->changes as $field => $values) {
+        foreach ($approval->changes ?? [] as $field => $values) {
             $diff[] = [
                 'field' => $field,
                 'label' => $this->fieldLabel($field),
-                'old' => $values['old'] ?? '-',
-                'new' => $values['new'] ?? '-',
+                'old'   => $values['old'] ?? '-',
+                'new'   => $values['new'] ?? '-',
             ];
         }
         return $diff;
@@ -135,36 +128,15 @@ class ApprovalController extends Controller
 
     private function fieldLabel(string $field): string
     {
-        $labels = [
-            'display_name' => 'Nama',
-            'birth_date' => 'Tanggal Lahir',
-            'gender' => 'Jenis Kelamin',
-            'status' => 'Status',
-        ];
-        return $labels[$field] ?? $field;
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return [
+            'display_name'   => 'Nama',
+            'birth_date'     => 'Tanggal Lahir',
+            'birth_accuracy' => 'Akurasi Lahir',
+            'death_date'     => 'Tanggal Meninggal',
+            'death_accuracy' => 'Akurasi Meninggal',
+            'gender'         => 'Jenis Kelamin',
+            'status'         => 'Status',
+            'family_unit_id' => 'Unit Keluarga',
+        ][$field] ?? $field;
     }
 }
