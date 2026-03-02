@@ -7,6 +7,8 @@ use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\RelationshipController;
 use App\Http\Controllers\TreeController;
+use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\ExportController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -52,6 +54,27 @@ Route::middleware(['auth', 'verified', 'role:admin|moderator'])->group(function 
     Route::get('/approvals/{approval}',               [ApprovalController::class, 'show'])->name('approvals.show');
     Route::post('/approvals/{approval}/approve',      [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/approvals/{approval}/reject',       [ApprovalController::class, 'reject'])->name('approvals.reject');
+});
+
+// admin only
+Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/users',                              [UserManagementController::class, 'index'])->name('users.index');
+    Route::get('/users/{user}',                       [UserManagementController::class, 'show'])->name('users.show');
+    Route::patch('/users/{user}/role',                [UserManagementController::class, 'updateRole'])->name('users.update-role');
+    Route::post('/users/{user}/reset-password',       [UserManagementController::class, 'sendPasswordReset'])->name('users.reset-password');
+});
+
+// export routes (admin only)
+Route::middleware(['auth', 'verified', 'role:admin'])->prefix('export')->name('export.')->group(function () {
+    Route::get('/',                    [ExportController::class, 'index'])->name('index');
+    Route::get('/people/csv',          [ExportController::class, 'exportPeopleCSV'])->name('people.csv');
+    Route::get('/relations/csv',       [ExportController::class, 'exportRelationsCSV'])->name('relations.csv');
+    Route::get('/statistics/csv',      [ExportController::class, 'exportStatisticsCSV'])->name('statistics.csv');
+});
+
+// person pdf — accessible to all logged-in users (for their own profile)
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/export/people/{person}/pdf', [ExportController::class, 'exportPersonPDF'])->name('export.person.pdf');
 });
 
 Route::middleware('auth')->group(function () {

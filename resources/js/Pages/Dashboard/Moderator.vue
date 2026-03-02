@@ -1,5 +1,5 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 
 const props = defineProps({
     stats: { type: Object, default: () => ({}) },
@@ -32,6 +32,8 @@ const eventColor = (event) => ({
 </script>
 
 <template>
+
+    <Head title="Moderator" />
     <div class="space-y-6">
         <!-- header -->
         <div>
