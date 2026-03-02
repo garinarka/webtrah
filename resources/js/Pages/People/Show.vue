@@ -12,7 +12,7 @@ const props = defineProps({
     can: Object,
 });
 
-// ── DATE FORMATTING ──────────────────────────────────────────────────────────
+// DATE FORMATTING
 const formatDate = (rawDate, accuracy) => {
     if (!rawDate) return null;
     // strip timezone noise — ambil hanya bagian tanggal saja
@@ -41,7 +41,7 @@ const accuracyLabel = (accuracy) => ({
 
 const isDeceased = props.person.death_date != null;
 
-// ── STATUS CONFIG ────────────────────────────────────────────────────────────
+// STATUS CONFIG
 const statusConfig = (status) => ({
     active: { label: 'Aktif', cls: 'bg-green-50 text-green-700 ring-green-600/20' },
     pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 ring-amber-600/20' },
@@ -54,7 +54,7 @@ const genderLabel = (gender) => ({
     male: 'Laki-laki', female: 'Perempuan', unknown: 'Tidak Diketahui',
 }[gender] ?? '-');
 
-// ── DELETE MODAL ─────────────────────────────────────────────────────────────
+// DELETE MODAL
 const showDeleteModal = ref(false);
 const deleteReason = ref('');
 const deleteProcessing = ref(false);
@@ -68,7 +68,7 @@ const submitDelete = () => {
     });
 };
 
-// ── AUDIT LOG ────────────────────────────────────────────────────────────────
+// AUDIT LOG
 const eventLabel = (event) => ({
     created: 'Dibuat',
     updated: 'Diperbarui',
@@ -121,6 +121,14 @@ const eventColor = (event) => ({
                         </svg>
                         Edit
                     </Link>
+                    <a :href="`/export/people/${person.id}/pdf`" target="_blank"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        Export
+                    </a>
                     <button v-if="can.delete" @click="showDeleteModal = true"
                         class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -163,13 +171,13 @@ const eventColor = (event) => ({
                             <dd class="mt-1 text-sm font-medium text-gray-900">{{ genderLabel(person.gender) }}</dd>
                         </div>
 
-                        <!-- tanggal Lahir -->
+                        <!-- tanggal lahir -->
                         <div>
                             <dt class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tanggal Lahir</dt>
                             <dd class="mt-1 text-sm text-gray-900">
                                 <template v-if="formatDate(person.birth_date, person.birth_accuracy)">
                                     <span class="font-medium">{{ formatDate(person.birth_date, person.birth_accuracy)
-                                        }}</span>
+                                    }}</span>
                                     <span v-if="accuracyLabel(person.birth_accuracy)"
                                         class="text-xs text-gray-400 ml-1">
                                         ({{ accuracyLabel(person.birth_accuracy) }})
@@ -186,7 +194,7 @@ const eventColor = (event) => ({
                             <dd class="mt-1 text-sm text-gray-900">
                                 <template v-if="formatDate(person.death_date, person.death_accuracy)">
                                     <span class="font-medium">{{ formatDate(person.death_date, person.death_accuracy)
-                                        }}</span>
+                                    }}</span>
                                     <span v-if="accuracyLabel(person.death_accuracy)"
                                         class="text-xs text-gray-400 ml-1">
                                         ({{ accuracyLabel(person.death_accuracy) }})
