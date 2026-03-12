@@ -18,14 +18,14 @@ class PersonController extends Controller
 {
     use AuthorizesRequests;
 
-    // LIST
+    // ─── LIST ──────────────────────────────────────────────────────────────
 
     public function index(Request $request)
     {
         $user  = auth()->user();
-        $query = Person::with(['familyUnit', 'creator']);
+        $query = Person::with(['familyUnit', 'creator:id,name']);
 
-        // user biasa hanya lihat record yang dia buat
+        // User biasa hanya lihat record yang dia buat
         if ($user->isUser() && !$user->isAdmin() && !$user->isModerator()) {
             $query->where('created_by', $user->id);
         }
@@ -58,7 +58,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // SHOW
+    // ─── SHOW ──────────────────────────────────────────────────────────────
 
     public function show(Person $person)
     {
@@ -71,7 +71,7 @@ class PersonController extends Controller
             ->limit(20)
             ->get();
 
-        // relasi — semua yang approved (aktif) maupun pending (untuk ditampilkan ke admin/mod)
+        // Relasi — semua yang approved (aktif) maupun pending (untuk ditampilkan ke admin/mod)
         $user = auth()->user();
 
         $relationshipsRaw = \App\Models\Relationship::with(['subject:id,display_name,gender,birth_date', 'object:id,display_name,gender,birth_date'])
@@ -81,7 +81,7 @@ class PersonController extends Controller
             ->orderBy('type')
             ->get();
 
-        // kelompokkan jadi parents, children, spouses dari sudut pandang person ini
+        // Kelompokkan jadi parents, children, spouses dari sudut pandang person ini
         $parents   = [];
         $children  = [];
         $spouses   = [];
@@ -99,7 +99,7 @@ class PersonController extends Controller
             ];
 
             if ($rel->status === 'pending') {
-                // tampilkan pending hanya ke admin/moderator
+                // Tampilkan pending hanya ke admin/moderator
                 if ($user->isAdmin() || $user->isModerator()) {
                     $related = $rel->subject_id === $person->id ? $rel->object : $rel->subject;
                     $pending[] = array_merge($entry, ['person' => $related]);
@@ -107,7 +107,7 @@ class PersonController extends Controller
                 continue;
             }
 
-            // approved — kelompokkan berdasarkan type & posisi
+            // Approved — kelompokkan berdasarkan type & posisi
             if (in_array($rel->type, ['parent', 'step_parent', 'adopted_parent'])) {
                 if ($rel->object_id === $person->id) {
                     // subject adalah orang tua dari person ini
@@ -122,7 +122,7 @@ class PersonController extends Controller
             }
         }
 
-        // daftar semua orang aktif untuk dropdown tambah relasi
+        // Daftar semua orang aktif untuk dropdown tambah relasi
         $peoplelist = Person::where('id', '!=', $person->id)
             ->where('status', 'active')
             ->orderBy('display_name')
@@ -142,7 +142,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // CREATE FORM
+    // ─── CREATE FORM ───────────────────────────────────────────────────────
 
     public function create()
     {
@@ -158,7 +158,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // STORE
+    // ─── STORE ─────────────────────────────────────────────────────────────
 
     public function store(StorePersonRequest $request)
     {
@@ -168,8 +168,8 @@ class PersonController extends Controller
 
         DB::beginTransaction();
         try {
-            // admin: langsung active tanpa approval
-            // moderator / user: masuk pending, butuh approval
+            // Admin: langsung active tanpa approval
+            // Moderator / User: masuk pending, butuh approval
             if ($user->isAdmin() && !$isDraft) {
                 $status = 'active';
             } else {
@@ -188,7 +188,7 @@ class PersonController extends Controller
                 'display_name'   => $data['display_name'],
             ]);
 
-            // buat approval request hanya jika bukan admin dan bukan draft
+            // Buat approval request hanya jika bukan admin dan bukan draft
             if (!$user->isAdmin() && !$isDraft) {
                 $approval = Approval::create([
                     'approvable_type' => Person::class,
@@ -232,7 +232,7 @@ class PersonController extends Controller
         }
     }
 
-    // EDIT FORM
+    // ─── EDIT FORM ─────────────────────────────────────────────────────────
 
     public function edit(Person $person)
     {
@@ -253,7 +253,7 @@ class PersonController extends Controller
         ]);
     }
 
-    // UPDATE
+    // ─── UPDATE ────────────────────────────────────────────────────────────
 
     public function update(UpdatePersonRequest $request, Person $person)
     {
@@ -284,12 +284,12 @@ class PersonController extends Controller
             );
 
             if ($user->isAdmin()) {
-                // admin: langsung update, tidak perlu approval
+                // Admin: langsung update, tidak perlu approval
                 $person->update(collect($data)->only($trackableFields)->all());
                 AuditLog::record($person, 'updated', $oldValues, collect($data)->only($trackableFields)->all());
                 $message = 'Data anggota berhasil diperbarui.';
             } else {
-                // moderator & user: buat approval request, data tidak langsung berubah
+                // Moderator & User: buat approval request, data tidak langsung berubah
                 $approval = Approval::create([
                     'approvable_type' => Person::class,
                     'approvable_id'   => $person->id,
@@ -311,7 +311,7 @@ class PersonController extends Controller
         }
     }
 
-    // DELETE
+    // ─── DELETE ────────────────────────────────────────────────────────────
 
     public function destroy(Request $request, Person $person)
     {
@@ -325,7 +325,7 @@ class PersonController extends Controller
             $oldValues = $person->toArray();
 
             if ($user->isAdmin()) {
-                // admin: langsung hapus
+                // Admin: langsung hapus
                 AuditLog::record($person, 'deleted', $oldValues, [
                     'deleted_by' => $user->name,
                     'reason'     => $request->reason,
@@ -334,7 +334,7 @@ class PersonController extends Controller
                 DB::commit();
                 return redirect()->route('people.index')->with('message', 'Anggota berhasil dihapus.');
             } else {
-                // moderator: ajukan penghapusan, tunggu persetujuan admin
+                // Moderator: ajukan penghapusan, tunggu persetujuan admin
                 $approval = Approval::create([
                     'approvable_type' => Person::class,
                     'approvable_id'   => $person->id,
@@ -354,7 +354,7 @@ class PersonController extends Controller
         }
     }
 
-    // BULK DELETE
+    // ─── BULK DELETE ───────────────────────────────────────────────────────
 
     public function bulkDestroy(Request $request)
     {
@@ -414,7 +414,7 @@ class PersonController extends Controller
         }
     }
 
-    // DRAFT AUTO-SAVE
+    // ─── DRAFT AUTO-SAVE ───────────────────────────────────────────────────
 
     public function saveDraft(Request $request)
     {
@@ -440,7 +440,7 @@ class PersonController extends Controller
         return response()->json(['cleared' => true]);
     }
 
-    // DUPLICATE DETECTION
+    // ─── DUPLICATE DETECTION ───────────────────────────────────────────────
 
     public function checkDuplicates(Request $request)
     {

@@ -16,12 +16,12 @@ class ApprovalController extends Controller
 
     public function index(Request $request)
     {
-        $query = Approval::with(['approvable', 'requester'])
+        $query = Approval::with(['approvable.familyUnit:id,name', 'requester:id,name'])
             ->where('status', 'pending')
             ->orderBy('created_at', 'desc');
 
-        // moderator hanya lihat semua pending (family_unit_id tidak ada di users)
-        // admin lihat semua
+        // Moderator hanya lihat semua pending (family_unit_id tidak ada di users)
+        // Admin lihat semua
         $approvals = $query->paginate(15);
 
         return Inertia::render('Approvals/Index', [
@@ -57,7 +57,7 @@ class ApprovalController extends Controller
             'confirmation' => 'required|in:SETUJU',
         ]);
 
-        // terapkan perubahan sesuai action
+        // Terapkan perubahan sesuai action
         if ($approval->action === 'create') {
             $approval->approvable->update(['status' => 'active']);
         } elseif ($approval->action === 'update') {
@@ -75,7 +75,7 @@ class ApprovalController extends Controller
             'approved_at' => now(),
         ]);
 
-        // notifikasi ke requester
+        // Notifikasi ke requester
         $requester = $approval->requester;
         if ($requester) {
             $requester->notify(new ApprovalDecided($approval->fresh(['approvable', 'approver']), 'approved'));
@@ -100,7 +100,7 @@ class ApprovalController extends Controller
             'rejection_reason' => $request->reason,
         ]);
 
-        // notifikasi ke requester
+        // Notifikasi ke requester
         $requester = $approval->requester;
         if ($requester) {
             $requester->notify(new ApprovalDecided($approval->fresh(['approvable', 'approver']), 'rejected', $request->reason));
@@ -110,8 +110,8 @@ class ApprovalController extends Controller
             ->with('message', 'Perubahan ditolak.');
     }
 
-    // HELPERS
-    
+    // ── HELPERS ────────────────────────────────────────────────────────────
+
     private function formatDiff(Approval $approval): array
     {
         $diff = [];
