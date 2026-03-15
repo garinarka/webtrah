@@ -1,5 +1,6 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 import PersonFormWizard from '@/features/people/components/PersonFormWizard.vue';
 
@@ -7,6 +8,32 @@ const props = defineProps({
     person: { type: Object, required: true },
     familyUnits: { type: Array, default: () => [] },
     auditLogs: { type: Array, default: () => [] },
+});
+
+const page = usePage();
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
+
+// Deteksi ?mode=draft dari URL — menandakan user datang dari halaman Drafts
+// dan perlu diperlakukan dengan aturan draft (tanpa validasi hasChanges, dua tombol submit)
+const isDraftMode = computed(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === 'draft';
+});
+
+const pageTitle = computed(() => {
+    if (isDraftMode.value) return `Lanjutkan Draft: ${props.person.display_name}`;
+    return `Edit: ${props.person.display_name}`;
+});
+
+const subtitle = computed(() => {
+    if (isDraftMode.value) {
+        return isAdmin.value
+            ? 'Klik "Simpan & Aktifkan" untuk mempublikasikan, atau "Simpan Draft" untuk lanjutkan nanti.'
+            : 'Klik "Ajukan ke Admin" untuk meminta persetujuan, atau "Simpan Draft" untuk lanjutkan nanti.';
+    }
+    return isAdmin.value
+        ? 'Perubahan data akan langsung diterapkan.'
+        : 'Perubahan data memerlukan persetujuan moderator / admin.';
 });
 
 const eventLabel = (event) => ({
@@ -30,26 +57,37 @@ const eventColor = (event) => ({
 
 <template>
 
-    <Head :title="`Edit: ${person.display_name}`" />
+    <Head :title="pageTitle" />
     <AppLayout>
         <div class="max-w-5xl mx-auto">
-            <!-- page header -->
+            <!-- Header -->
             <div class="mb-8">
                 <nav class="flex items-center gap-2 text-sm text-gray-500 mb-3">
                     <Link href="/people" class="hover:text-indigo-600 transition-colors">Daftar Anggota</Link>
+                    <template v-if="isDraftMode">
+                        <span class="text-gray-300">/</span>
+                        <Link href="/people/drafts" class="hover:text-indigo-600 transition-colors">Draft Saya</Link>
+                    </template>
                     <span class="text-gray-300">/</span>
                     <Link :href="`/people/${person.id}`" class="hover:text-indigo-600 transition-colors">
                         {{ person.display_name }}
                     </Link>
                     <span class="text-gray-300">/</span>
-                    <span class="text-gray-900 font-medium">Edit</span>
+                    <span class="text-gray-900 font-medium">{{ isDraftMode ? 'Lanjutkan Draft' : 'Edit' }}</span>
                 </nav>
                 <div class="flex items-center justify-between">
                     <div>
-                        <h1 class="text-2xl font-bold text-gray-900">Edit Anggota</h1>
-                        <p class="mt-1 text-sm text-gray-500">
-                            Perubahan data memerlukan persetujuan moderator / admin.
-                        </p>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-2xl font-bold text-gray-900">
+                                {{ isDraftMode ? 'Lanjutkan Draft' : 'Edit Anggota' }}
+                            </h1>
+                            <!-- Draft mode badge -->
+                            <span v-if="isDraftMode"
+                                class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700">
+                                📝 Mode Draft
+                            </span>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500">{{ subtitle }}</p>
                     </div>
                     <span :class="[
                         'px-3 py-1 text-xs font-semibold rounded-full',
@@ -64,17 +102,17 @@ const eventColor = (event) => ({
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- main form (2/3) -->
+                <!-- Form (2/3) -->
                 <div class="lg:col-span-2">
                     <PersonFormWizard :initial-data="{
                         ...person,
                         birth_date: person.birth_date,
                         death_date: person.death_date,
-                    }" :family-units="familyUnits" :is-edit-mode="true" :person-id="person.id"
-                        :submit-route="`/people/${person.id}`" submit-method="patch" />
+                    }" :family-units="familyUnits" :is-edit-mode="true" :is-draft-mode="isDraftMode"
+                        :person-id="person.id" :submit-route="`/people/${person.id}`" submit-method="patch" />
                 </div>
 
-                <!-- audit log sidebar (1/3) -->
+                <!-- Audit log (1/3) -->
                 <div class="lg:col-span-1">
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                         <h3 class="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -84,21 +122,17 @@ const eventColor = (event) => ({
                             </svg>
                             Riwayat Perubahan
                         </h3>
-
                         <div v-if="auditLogs.length === 0" class="text-xs text-gray-400 text-center py-6">
                             Belum ada riwayat perubahan.
                         </div>
-
                         <div v-else class="space-y-3">
                             <div v-for="log in auditLogs" :key="log.id"
                                 class="flex gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                                <!-- event badge -->
                                 <div class="flex-shrink-0 mt-0.5">
                                     <span :class="['px-1.5 py-0.5 text-xs font-medium rounded', eventColor(log.event)]">
                                         {{ eventLabel(log.event) }}
                                     </span>
                                 </div>
-
                                 <div class="flex-1 min-w-0">
                                     <p class="text-xs text-gray-500">
                                         oleh <span class="font-medium text-gray-700">{{ log.user?.name ?? 'System'

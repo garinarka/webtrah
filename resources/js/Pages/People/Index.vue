@@ -1,25 +1,24 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/layouts/AppLayout.vue';
 
 const props = defineProps({
     people: Object,
     filters: Object,
     can: Object,
+    draftCount: { type: Number, default: 0 },
 });
 
-// ── FILTERS ─────────────────────────────────────────────────────────────────
+const page = usePage();
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
+const isModerator = computed(() => ['admin', 'moderator'].includes(page.props.auth?.user?.role));
+
+// ── FILTERS ──────────────────────────────────────────────────────────────────
+
 const search = ref(props.filters.search || '');
 const statusFilter = ref(props.filters.status || '');
 const genderFilter = ref(props.filters.gender || '');
-
-let searchTimer;
-watch(search, (val) => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => applyFilters(), 350);
-});
-watch([statusFilter, genderFilter], () => applyFilters());
 
 const applyFilters = () => {
     const params = {};
@@ -36,82 +35,66 @@ const clearFilters = () => {
     router.get('/people', {}, { preserveState: true, replace: true });
 };
 
+let searchTimer;
+watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(applyFilters, 350); });
+watch([statusFilter, genderFilter], applyFilters);
+
 const hasActiveFilters = computed(() => search.value || statusFilter.value || genderFilter.value);
 
-// ── SELECTION ────────────────────────────────────────────────────────────────
-const selected = ref([]);
-const allChecked = computed(() =>
-    props.people.data.length > 0 && selected.value.length === props.people.data.length
-);
-const someChecked = computed(() =>
-    selected.value.length > 0 && selected.value.length < props.people.data.length
-);
+// ── SELECTION ─────────────────────────────────────────────────────────────────
 
-const toggleAll = () => {
-    selected.value = allChecked.value ? [] : props.people.data.map(p => p.id);
-};
+const selected = ref([]);
+const allChecked = computed(() => props.people.data.length > 0 && selected.value.length === props.people.data.length);
+const someChecked = computed(() => selected.value.length > 0 && selected.value.length < props.people.data.length);
+
+const toggleAll = () => { selected.value = allChecked.value ? [] : props.people.data.map(p => p.id); };
 const toggleOne = (id) => {
     selected.value = selected.value.includes(id)
         ? selected.value.filter(x => x !== id)
         : [...selected.value, id];
 };
 
-// ── BULK DELETE ──────────────────────────────────────────────────────────────
+// ── BULK DELETE ───────────────────────────────────────────────────────────────
+
 const showBulkDeleteModal = ref(false);
 const bulkReason = ref('');
 const bulkProcessing = ref(false);
 
-const confirmBulkDelete = () => {
-    if (selected.value.length === 0) return;
-    showBulkDeleteModal.value = true;
-    bulkReason.value = '';
-};
-
+const confirmBulkDelete = () => { if (selected.value.length) { showBulkDeleteModal.value = true; bulkReason.value = ''; } };
 const submitBulkDelete = () => {
     if (!bulkReason.value || bulkReason.value.length < 5) return;
     bulkProcessing.value = true;
     router.delete('/people/bulk-destroy', {
         data: { ids: selected.value, reason: bulkReason.value },
-        onSuccess: () => {
-            selected.value = [];
-            showBulkDeleteModal.value = false;
-            bulkReason.value = '';
-        },
+        onSuccess: () => { selected.value = []; showBulkDeleteModal.value = false; bulkReason.value = ''; },
         onFinish: () => { bulkProcessing.value = false; },
     });
 };
 
-// ── SINGLE DELETE ────────────────────────────────────────────────────────────
+// ── SINGLE DELETE ─────────────────────────────────────────────────────────────
+
 const showDeleteModal = ref(false);
 const deleteTarget = ref(null);
 const deleteReason = ref('');
 const deleteProcessing = ref(false);
 
-const confirmDelete = (person) => {
-    deleteTarget.value = person;
-    deleteReason.value = '';
-    showDeleteModal.value = true;
-};
-
+const confirmDelete = (person) => { deleteTarget.value = person; deleteReason.value = ''; showDeleteModal.value = true; };
 const submitDelete = () => {
     if (!deleteReason.value || deleteReason.value.length < 5) return;
     deleteProcessing.value = true;
     router.delete(`/people/${deleteTarget.value.id}`, {
         data: { reason: deleteReason.value },
-        onSuccess: () => {
-            showDeleteModal.value = false;
-            deleteTarget.value = null;
-        },
+        onSuccess: () => { showDeleteModal.value = false; deleteTarget.value = null; },
         onFinish: () => { deleteProcessing.value = false; },
     });
 };
 
-// ── HELPERS ──────────────────────────────────────────────────────────────────
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+
 const statusConfig = (status) => ({
-    active: { label: 'Aktif', cls: 'bg-success-50 text-success-700 ring-success-600/20' },
-    pending: { label: 'Pending', cls: 'bg-warning-50 text-warning-700 ring-warning-600/20' },
+    active: { label: 'Aktif', cls: 'bg-green-50 text-green-700 ring-green-600/20' },
+    pending: { label: 'Pending', cls: 'bg-amber-50 text-amber-700 ring-amber-600/20' },
     draft: { label: 'Draft', cls: 'bg-gray-50 text-gray-600 ring-gray-500/20' },
-    disputed: { label: 'Disputed', cls: 'bg-danger-50 text-danger-700 ring-danger-600/20' },
     archived: { label: 'Arsip', cls: 'bg-gray-100 text-gray-500 ring-gray-400/20' },
 }[status] ?? { label: status, cls: 'bg-gray-50 text-gray-600 ring-gray-500/20' });
 
@@ -121,9 +104,14 @@ const genderConfig = (gender) => ({
     unknown: { label: '?', bg: 'bg-gray-100 text-gray-500' },
 }[gender] ?? { label: '?', bg: 'bg-gray-100 text-gray-500' });
 
+/**
+ * Ambil tahun dari string tanggal tanpa parse sebagai UTC.
+ * new Date("2025-01-01").getFullYear() → 2024 di UTC+7 (midnight UTC = malam sebelumnya).
+ * Fix: ambil komponen langsung dari string.
+ */
 const formatYear = (dateStr) => {
     if (!dateStr) return null;
-    return new Date(dateStr).getFullYear();
+    return parseInt(String(dateStr).split('T')[0].split('-')[0], 10);
 };
 </script>
 
@@ -133,24 +121,44 @@ const formatYear = (dateStr) => {
     <AppLayout>
         <div class="space-y-5">
 
-            <!-- page header -->
+            <!-- Header -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h1 class="text-xl font-semibold text-gray-950">Anggota Keluarga</h1>
                     <p class="text-sm text-gray-500 mt-0.5">{{ people.total }} total anggota terdaftar</p>
                 </div>
-                <Link v-if="can.create" href="/people/create"
-                    class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-sm transition-colors">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    Tambah Anggota
-                </Link>
+                <div class="flex items-center gap-2">
+                    <!-- Draft button — inactive (disabled) kalau tidak ada draft -->
+                    <Link href="/people/drafts" :class="[
+                        'inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border transition-colors',
+                        draftCount > 0
+                            ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            : 'bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed pointer-events-none',
+                    ]" :aria-disabled="draftCount === 0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        Draft
+                        <span v-if="draftCount > 0" :class="[
+                            'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-xs font-semibold',
+                            'bg-amber-100 text-amber-700',
+                        ]">{{ draftCount }}</span>
+                    </Link>
+
+                    <Link v-if="can.create" href="/people/create"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-sm transition-colors">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Tambah Anggota
+                    </Link>
+                </div>
             </div>
 
-            <!-- flash message -->
+            <!-- Flash -->
             <div v-if="$page.props.flash?.message"
-                class="flex items-center gap-3 px-4 py-3 bg-success-50 border border-success-200 text-success-800 text-sm rounded-lg">
+                class="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 text-green-800 text-sm rounded-lg">
                 <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd"
                         d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
@@ -159,12 +167,12 @@ const formatYear = (dateStr) => {
                 {{ $page.props.flash.message }}
             </div>
 
-            <!-- main table card -->
+            <!-- Table Card -->
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
 
-                <!-- table toolbar -->
+                <!-- Toolbar -->
                 <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center gap-3">
-                    <!-- search -->
+                    <!-- Search -->
                     <div class="relative flex-1 min-w-[200px] max-w-xs">
                         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
                             viewBox="0 0 24 24" stroke="currentColor">
@@ -175,26 +183,24 @@ const formatYear = (dateStr) => {
                             class="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" />
                     </div>
 
-                    <!-- status filter -->
+                    <!-- Status filter -->
                     <select v-model="statusFilter"
-                        class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-gray-700">
+                        class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-700">
                         <option value="">Semua Status</option>
                         <option value="active">Aktif</option>
-                        <option value="pending">Pending</option>
-                        <option value="draft">Draft</option>
-                        <option value="disputed">Disputed</option>
+                        <option value="archived">Arsip</option>
                     </select>
 
-                    <!-- gender filter -->
+                    <!-- Gender filter -->
                     <select v-model="genderFilter"
-                        class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-gray-700">
+                        class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-700">
                         <option value="">Semua Gender</option>
                         <option value="male">Laki-laki</option>
                         <option value="female">Perempuan</option>
                         <option value="unknown">Tidak Diketahui</option>
                     </select>
 
-                    <!-- clear filters -->
+                    <!-- Reset filter -->
                     <button v-if="hasActiveFilters" @click="clearFilters"
                         class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -203,22 +209,17 @@ const formatYear = (dateStr) => {
                         Reset
                     </button>
 
-                    <!-- bulk actions (shown when items selected) -->
+                    <!-- Bulk actions -->
                     <div v-if="selected.length > 0 && can.bulk_delete" class="ml-auto flex items-center gap-2">
                         <span class="text-sm text-gray-600 font-medium">{{ selected.length }} dipilih</span>
                         <button @click="confirmBulkDelete"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                                stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16" />
-                            </svg>
                             Hapus Terpilih
                         </button>
                     </div>
                 </div>
 
-                <!-- table -->
+                <!-- Table -->
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
@@ -246,7 +247,6 @@ const formatYear = (dateStr) => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <!-- empty state -->
                             <tr v-if="people.data.length === 0">
                                 <td :colspan="can.bulk_delete ? 6 : 5" class="px-4 py-16 text-center">
                                     <div class="flex flex-col items-center gap-2 text-gray-400">
@@ -264,14 +264,12 @@ const formatYear = (dateStr) => {
                                 'group transition-colors',
                                 selected.includes(person.id) ? 'bg-indigo-50/60' : 'hover:bg-gray-50/80',
                             ]">
-                                <!-- checkbox -->
                                 <td v-if="can.bulk_delete" class="px-4 py-3">
                                     <input type="checkbox" :checked="selected.includes(person.id)"
                                         @change="toggleOne(person.id)"
                                         class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                                 </td>
 
-                                <!-- name + avatar -->
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
                                         <div
@@ -291,37 +289,30 @@ const formatYear = (dateStr) => {
                                     </div>
                                 </td>
 
-                                <!-- birth year -->
+                                <!-- Birth year — parse dari string agar tidak kena UTC timezone bug -->
                                 <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">
                                     {{ formatYear(person.birth_date) ?? '—' }}
-                                    <span v-if="person.death_date" class="text-gray-400">
-                                        – {{ formatYear(person.death_date) }}
-                                    </span>
+                                    <span v-if="person.death_date" class="text-gray-400"> – {{
+                                        formatYear(person.death_date) }}</span>
                                 </td>
 
-                                <!-- family unit -->
                                 <td class="px-4 py-3 text-gray-600 text-xs hidden md:table-cell">
                                     {{ person.family_unit?.name ?? '—' }}
                                 </td>
 
-                                <!-- status badge -->
                                 <td class="px-4 py-3">
-                                    <span :class="[
-                                        'inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset',
-                                        statusConfig(person.status).cls
-                                    ]">
+                                    <span
+                                        :class="['inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ring-1 ring-inset', statusConfig(person.status).cls]">
                                         {{ statusConfig(person.status).label }}
                                     </span>
                                 </td>
 
-                                <!-- actions -->
                                 <td class="px-4 py-3">
                                     <div
                                         class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <!-- view -->
                                         <Link :href="`/people/${person.id}`"
                                             class="p-1.5 rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                            title="Lihat detail">
+                                            title="Lihat">
                                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"
                                                 stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -331,7 +322,6 @@ const formatYear = (dateStr) => {
                                             </svg>
                                         </Link>
 
-                                        <!-- edit -->
                                         <Link v-if="can.edit" :href="`/people/${person.id}/edit`"
                                             class="p-1.5 rounded-md text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
                                             title="Edit">
@@ -342,7 +332,6 @@ const formatYear = (dateStr) => {
                                             </svg>
                                         </Link>
 
-                                        <!-- delete -->
                                         <button v-if="can.delete" @click="confirmDelete(person)"
                                             class="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                                             title="Hapus">
@@ -359,7 +348,7 @@ const formatYear = (dateStr) => {
                     </table>
                 </div>
 
-                <!-- table footer / pagination -->
+                <!-- Pagination -->
                 <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50/50">
                     <p class="text-xs text-gray-500">
                         Menampilkan {{ people.from ?? 0 }}–{{ people.to ?? 0 }} dari {{ people.total }} data
@@ -367,10 +356,8 @@ const formatYear = (dateStr) => {
                     <div class="flex items-center gap-1">
                         <Link v-for="(link, i) in people.links" :key="i" :href="link.url ?? '#'" :class="[
                             'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
-                            link.active
-                                ? 'bg-indigo-600 text-white'
-                                : link.url
-                                    ? 'text-gray-600 hover:bg-gray-100'
+                            link.active ? 'bg-indigo-600 text-white'
+                                : link.url ? 'text-gray-600 hover:bg-gray-100'
                                     : 'text-gray-300 cursor-not-allowed',
                         ]" v-html="link.label" />
                     </div>
@@ -378,7 +365,7 @@ const formatYear = (dateStr) => {
             </div>
         </div>
 
-        <!-- single delete modal -->
+        <!-- Single delete modal -->
         <Teleport to="body">
             <div v-if="showDeleteModal"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -393,25 +380,21 @@ const formatYear = (dateStr) => {
                         </div>
                         <div class="flex-1">
                             <h3 class="text-base font-semibold text-gray-900">Hapus Anggota</h3>
-                            <p class="text-sm text-gray-500 mt-1">
-                                Hapus <span class="font-medium text-gray-700">{{ deleteTarget?.display_name }}</span>?
-                                Tindakan ini tidak dapat dibatalkan.
-                            </p>
+                            <p class="text-sm text-gray-500 mt-1">Hapus <span class="font-medium text-gray-700">{{
+                                    deleteTarget?.display_name }}</span>? Tindakan ini tidak dapat dibatalkan.</p>
                             <div class="mt-4">
                                 <label class="block text-xs font-medium text-gray-700 mb-1">Alasan penghapusan <span
                                         class="text-red-500">*</span></label>
                                 <textarea v-model="deleteReason" rows="2" placeholder="Minimal 5 karakter..."
-                                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400" />
+                                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300" />
                             </div>
                         </div>
                     </div>
                     <div class="flex gap-3 mt-5 justify-end">
                         <button @click="showDeleteModal = false"
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                            Batal
-                        </button>
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
                         <button @click="submitDelete" :disabled="deleteReason.length < 5 || deleteProcessing"
-                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50">
+                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50">
                             {{ deleteProcessing ? 'Menghapus...' : 'Ya, Hapus' }}
                         </button>
                     </div>
@@ -419,7 +402,7 @@ const formatYear = (dateStr) => {
             </div>
         </Teleport>
 
-        <!-- bulk delete modal -->
+        <!-- Bulk delete modal -->
         <Teleport to="body">
             <div v-if="showBulkDeleteModal"
                 class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -434,24 +417,20 @@ const formatYear = (dateStr) => {
                         </div>
                         <div class="flex-1">
                             <h3 class="text-base font-semibold text-gray-900">Hapus {{ selected.length }} Anggota</h3>
-                            <p class="text-sm text-gray-500 mt-1">
-                                Semua data yang dipilih akan dihapus. Tindakan tidak dapat dibatalkan.
-                            </p>
+                            <p class="text-sm text-gray-500 mt-1">Semua data yang dipilih akan dihapus permanen.</p>
                             <div class="mt-4">
                                 <label class="block text-xs font-medium text-gray-700 mb-1">Alasan penghapusan <span
                                         class="text-red-500">*</span></label>
                                 <textarea v-model="bulkReason" rows="2" placeholder="Minimal 5 karakter..."
-                                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-400" />
+                                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300" />
                             </div>
                         </div>
                     </div>
                     <div class="flex gap-3 mt-5 justify-end">
                         <button @click="showBulkDeleteModal = false"
-                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                            Batal
-                        </button>
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Batal</button>
                         <button @click="submitBulkDelete" :disabled="bulkReason.length < 5 || bulkProcessing"
-                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50">
+                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-50">
                             {{ bulkProcessing ? 'Memproses...' : `Hapus ${selected.length} Anggota` }}
                         </button>
                     </div>

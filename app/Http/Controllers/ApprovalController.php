@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Approval;
 use App\Models\Person;
-use App\Models\User;
 use App\Notifications\ApprovalDecided;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
@@ -16,12 +15,30 @@ class ApprovalController extends Controller
 
     public function index(Request $request)
     {
+        /**
+         * Orphan check: approval yang approvable-nya sudah null (soft-deleted oleh admin)
+         * di-auto-reject agar tidak menggantung di queue.
+         * Ini terjadi misal: moderator ajukan delete → admin hapus langsung via UI
+         * → approval queue masih ada tapi person sudah hilang.
+         */
+        Approval::with('approvable')
+            ->where('status', 'pending')
+            ->get()
+            ->each(function (Approval $approval) {
+                if (is_null($approval->approvable)) {
+                    $approval->update([
+                        'status'           => 'rejected',
+                        'approved_by'      => auth()->id(),
+                        'approved_at'      => now(),
+                        'rejection_reason' => 'Data yang dimaksud sudah tidak ada (dihapus sebelum ditinjau).',
+                    ]);
+                }
+            });
+
         $query = Approval::with(['approvable.familyUnit:id,name', 'requester:id,name'])
             ->where('status', 'pending')
             ->orderBy('created_at', 'desc');
 
-        // Moderator hanya lihat semua pending (family_unit_id tidak ada di users)
-        // Admin lihat semua
         $approvals = $query->paginate(15);
 
         return Inertia::render('Approvals/Index', [
@@ -39,10 +56,13 @@ class ApprovalController extends Controller
 
         $user = auth()->user();
 
+        $approval->load(['approvable', 'requester', 'approver']);
+
         return Inertia::render('Approvals/Show', [
-            'approval' => $approval->load(['approvable', 'requester', 'approver']),
-            'diff'     => $this->formatDiff($approval),
-            'can'      => [
+            'approval'         => $approval,
+            'approvableExists' => !is_null($approval->approvable),
+            'diff'             => $this->formatDiff($approval),
+            'can'              => [
                 'approve' => $user->can('approve', $approval),
                 'reject'  => $user->can('reject', $approval),
             ],
@@ -57,16 +77,23 @@ class ApprovalController extends Controller
             'confirmation' => 'required|in:SETUJU',
         ]);
 
-        // Terapkan perubahan sesuai action
         if ($approval->action === 'create') {
-            $approval->approvable->update(['status' => 'active']);
-        } elseif ($approval->action === 'update') {
-            foreach ($approval->changes as $field => $values) {
-                $approval->approvable->{$field} = $values['new'];
+            $updateData = ['status' => 'active'];
+            foreach ($approval->changes ?? [] as $field => $values) {
+                if (isset($values['new']) && !in_array($field, ['status', 'created_by'])) {
+                    $updateData[$field] = $values['new'];
+                }
             }
-            $approval->approvable->save();
+            $approval->approvable?->update($updateData);
+        } elseif ($approval->action === 'update') {
+            if ($approval->approvable) {
+                foreach ($approval->changes as $field => $values) {
+                    $approval->approvable->{$field} = $values['new'];
+                }
+                $approval->approvable->save();
+            }
         } elseif ($approval->action === 'delete') {
-            $approval->approvable->delete();
+            $approval->approvable?->delete();
         }
 
         $approval->update([
@@ -75,7 +102,6 @@ class ApprovalController extends Controller
             'approved_at' => now(),
         ]);
 
-        // Notifikasi ke requester
         $requester = $approval->requester;
         if ($requester) {
             $requester->notify(new ApprovalDecided($approval->fresh(['approvable', 'approver']), 'approved'));
@@ -100,7 +126,6 @@ class ApprovalController extends Controller
             'rejection_reason' => $request->reason,
         ]);
 
-        // Notifikasi ke requester
         $requester = $approval->requester;
         if ($requester) {
             $requester->notify(new ApprovalDecided($approval->fresh(['approvable', 'approver']), 'rejected', $request->reason));
@@ -109,8 +134,6 @@ class ApprovalController extends Controller
         return redirect()->route('approvals.index')
             ->with('message', 'Perubahan ditolak.');
     }
-
-    // ── HELPERS ────────────────────────────────────────────────────────────
 
     private function formatDiff(Approval $approval): array
     {

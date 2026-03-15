@@ -8,7 +8,9 @@ class StorePersonRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create_person');
+        // Hanya admin dan moderator yang bisa tambah anggota
+        // User biasa hanya bisa edit data miliknya sendiri
+        return $this->user()->isAdmin() || $this->user()->isModerator();
     }
 
     public function rules(): array
@@ -37,30 +39,30 @@ class StorePersonRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'display_name.required' => 'Nama tampilan wajib diisi.',
-            'display_name.min'      => 'Nama minimal 2 karakter.',
-            'display_name.max'      => 'Nama maksimal 255 karakter.',
-            'gender.required'       => 'Jenis kelamin wajib dipilih.',
-            'gender.in'             => 'Jenis kelamin tidak valid.',
-            'birth_date.date'       => 'Format tanggal lahir tidak valid.',
+            'display_name.required'      => 'Nama tampilan wajib diisi.',
+            'display_name.min'           => 'Nama minimal 2 karakter.',
+            'gender.required'            => 'Jenis kelamin wajib dipilih.',
             'birth_date.before_or_equal' => 'Tanggal lahir tidak boleh di masa depan.',
-            'birth_accuracy.required'    => 'Akurasi tanggal lahir wajib dipilih.',
-            'death_date.date'        => 'Format tanggal meninggal tidak valid.',
             'death_date.before_or_equal' => 'Tanggal meninggal tidak boleh di masa depan.',
-            'family_unit_id.required' => 'Unit keluarga wajib dipilih.',
-            'family_unit_id.exists'   => 'Unit keluarga tidak ditemukan.',
+            'family_unit_id.required'    => 'Unit keluarga wajib dipilih.',
+            'family_unit_id.exists'      => 'Unit keluarga tidak ditemukan.',
         ];
     }
 
-    /**
-     * Prepare the data for validation — normalize empty strings to null.
-     */
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'birth_date'  => $this->birth_date ?: null,
-            'death_date'  => $this->death_date ?: null,
-            'is_draft'    => $this->boolean('is_draft', false),
+            'birth_date' => $this->normalizeDateInput($this->birth_date, $this->birth_accuracy),
+            'death_date' => $this->normalizeDateInput($this->death_date, $this->death_accuracy),
+            'is_draft'   => $this->boolean('is_draft', false),
         ]);
+    }
+
+    private function normalizeDateInput(?string $value, ?string $accuracy): ?string
+    {
+        if (!$value) return null;
+        if ($accuracy === 'year'       && preg_match('/^\d{4}$/',      $value)) return $value . '-01-01';
+        if ($accuracy === 'year_month' && preg_match('/^\d{4}-\d{2}$/', $value)) return $value . '-01';
+        return $value;
     }
 }

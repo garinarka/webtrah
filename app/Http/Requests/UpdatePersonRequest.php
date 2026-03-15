@@ -14,6 +14,10 @@ class UpdatePersonRequest extends FormRequest
 
     public function rules(): array
     {
+        $isAdmin     = $this->user()->isAdmin();
+        $isDraft     = $this->boolean('is_draft', false);
+        $isDraftMode = $this->route('person')?->status === 'draft';
+
         return [
             'display_name'   => ['required', 'string', 'min:2', 'max:255'],
             'gender'         => ['required', 'in:male,female,unknown'],
@@ -30,28 +34,43 @@ class UpdatePersonRequest extends FormRequest
                 },
             ],
             'death_accuracy' => ['required', 'in:exact,year_month,year,unknown'],
-            'edit_reason'    => ['required', 'string', 'min:5', 'max:500'],
+            'is_draft'       => ['boolean'],
+            // edit_reason tidak wajib untuk:
+            // - Admin (langsung save tanpa approval)
+            // - Mode simpan draft (is_draft=true)
+            // - Edit dari draft mode (isDraftMode=true) — ini seperti "create" bukan "edit"
+            'edit_reason'    => ($isAdmin || $isDraft || $isDraftMode)
+                ? ['nullable', 'string', 'max:500']
+                : ['required', 'string', 'min:5', 'max:500'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'display_name.required' => 'Nama tampilan wajib diisi.',
-            'display_name.min'      => 'Nama minimal 2 karakter.',
-            'gender.required'       => 'Jenis kelamin wajib dipilih.',
+            'display_name.required'      => 'Nama tampilan wajib diisi.',
+            'display_name.min'           => 'Nama minimal 2 karakter.',
             'birth_date.before_or_equal' => 'Tanggal lahir tidak boleh di masa depan.',
             'death_date.before_or_equal' => 'Tanggal meninggal tidak boleh di masa depan.',
-            'edit_reason.required'  => 'Alasan perubahan wajib diisi.',
-            'edit_reason.min'       => 'Alasan perubahan minimal 5 karakter.',
+            'edit_reason.required'       => 'Alasan perubahan wajib diisi.',
+            'edit_reason.min'            => 'Alasan perubahan minimal 5 karakter.',
         ];
     }
 
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'birth_date' => $this->birth_date ?: null,
-            'death_date' => $this->death_date ?: null,
+            'birth_date' => $this->normalizeDateInput($this->birth_date, $this->birth_accuracy),
+            'death_date' => $this->normalizeDateInput($this->death_date, $this->death_accuracy),
+            'is_draft'   => $this->boolean('is_draft', false),
         ]);
+    }
+
+    private function normalizeDateInput(?string $value, ?string $accuracy): ?string
+    {
+        if (!$value) return null;
+        if ($accuracy === 'year'       && preg_match('/^\d{4}$/',      $value)) return $value . '-01-01';
+        if ($accuracy === 'year_month' && preg_match('/^\d{4}-\d{2}$/', $value)) return $value . '-01';
+        return $value;
     }
 }
