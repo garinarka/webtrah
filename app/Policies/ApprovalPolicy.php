@@ -4,24 +4,28 @@ namespace App\Policies;
 
 use App\Models\Approval;
 use App\Models\User;
-// use Illuminate\Auth\Access\Response;
 
 class ApprovalPolicy
 {
-    /**
-     * Determine whether the user can view any models.
-     */
     public function viewAny(User $user): bool
     {
         return false;
     }
 
     /**
-     * Determine whether the user can view the model.
+     * siapa yang boleh lihat detail approval:
+     * - admin / moderator yang punya permission view_approvals
+     * - requester itu sendiri (agar bisa buka link dari notifikasi)
      */
     public function view(User $user, Approval $approval): bool
     {
-        return $user->can('view_approvals');
+        if ($user->can('view_approvals')) {
+            return true;
+        }
+
+        // requester boleh lihat approval miliknya sendiri
+        // (misal: user/moderator klik notif "ajuanmu disetujui")
+        return (int) $approval->requested_by === (int) $user->id;
     }
 
     public function approve(User $user, Approval $approval): bool
@@ -35,8 +39,15 @@ class ApprovalPolicy
                 return false;
             }
 
+            // ⚠️  approvable bisa NULL jika person sudah dihapus
+            // (misal: approval "delete" sudah disetujui → person terhapus)
             $approvable = $approval->approvable;
-            return $user->family_unit_id === $approvable->family_unit_id;
+            if (is_null($approvable)) {
+                // approval sudah selesai, tidak ada lagi yang bisa di-approve
+                return false;
+            }
+
+            return (int) $user->family_unit_id === (int) $approvable->family_unit_id;
         }
 
         return false;
@@ -47,41 +58,22 @@ class ApprovalPolicy
         return $this->approve($user, $approval);
     }
 
-    /**
-     * Determine whether the user can create models.
-     */
     public function create(User $user): bool
     {
         return false;
     }
-
-    /**
-     * Determine whether the user can update the model.
-     */
     public function update(User $user, Approval $approval): bool
     {
         return false;
     }
-
-    /**
-     * Determine whether the user can delete the model.
-     */
     public function delete(User $user, Approval $approval): bool
     {
         return false;
     }
-
-    /**
-     * Determine whether the user can restore the model.
-     */
     public function restore(User $user, Approval $approval): bool
     {
         return false;
     }
-
-    /**
-     * Determine whether the user can permanently delete the model.
-     */
     public function forceDelete(User $user, Approval $approval): bool
     {
         return false;

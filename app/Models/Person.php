@@ -24,9 +24,16 @@ class Person extends Model
         'display_name',
     ];
 
+    /**
+     * Cast 'date:Y-m-d' — serialize ke JSON sebagai "YYYY-MM-DD" bukan ISO timestamp.
+     * 
+     * Sebelumnya cast 'date' menyebabkan Carbon serialize ke "2007-09-14T17:00:00.000000Z"
+     * (UTC midnight dari timezone Asia/Jakarta) sehingga frontend menerima tanggal -1 hari.
+     * Dengan format 'date:Y-m-d', output JSON selalu "2007-09-15" tanpa timezone noise.
+     */
     protected $casts = [
-        'birth_date' => 'date',
-        'death_date' => 'date',
+        'birth_date' => 'date:Y-m-d',
+        'death_date' => 'date:Y-m-d',
     ];
 
     public function familyUnit(): BelongsTo
@@ -52,84 +59,5 @@ class Person extends Model
     public function approvals()
     {
         return $this->morphMany(Approval::class, 'approvable');
-    }
-
-    // ── RELATIONSHIPS ──────────────────────────────────────────────────────
-
-    /**
-     * relasi di mana orang ini adalah subject (misal: "saya adalah orang tua dari x")
-     */
-    public function relationshipsAsSubject()
-    {
-        return $this->hasMany(Relationship::class, 'subject_id');
-    }
-
-    /**
-     * relasi di mana orang ini adalah object (misal: "x adalah orang tua dari saya")
-     */
-    public function relationshipsAsObject()
-    {
-        return $this->hasMany(Relationship::class, 'object_id');
-    }
-
-    /**
-     * orang tua: relationships di mana object_id = this->id and type = 'parent'
-     * subject = orang tua, object = anak (orang ini)
-     */
-    public function parents()
-    {
-        return $this->belongsToMany(
-            Person::class,
-            'relationships',
-            'object_id',   // fk ke tabel ini (anak = orang ini)
-            'subject_id'   // fk ke person lain (orang tua)
-        )->wherePivot('type', 'parent')
-            ->wherePivot('status', 'approved')
-            ->whereNull('relationships.ended_at')
-            ->withPivot(['id', 'type', 'is_biological', 'status', 'started_at']);
-    }
-
-    /**
-     * anak: relationships di mana subject_id = this->id and type = 'parent'
-     * subject = orang tua (orang ini), object = anak
-     */
-    public function children()
-    {
-        return $this->belongsToMany(
-            Person::class,
-            'relationships',
-            'subject_id',  // fk ke tabel ini (orang tua = orang ini)
-            'object_id'    // fk ke person lain (anak)
-        )->wherePivot('type', 'parent')
-            ->wherePivot('status', 'approved')
-            ->whereNull('relationships.ended_at')
-            ->withPivot(['id', 'type', 'is_biological', 'status', 'started_at']);
-    }
-
-    /**
-     * pasangan: relationships di mana subject_id atau object_id = this->id and type = 'spouse'
-     */
-    public function spousesAsSubject()
-    {
-        return $this->belongsToMany(
-            Person::class,
-            'relationships',
-            'subject_id',
-            'object_id'
-        )->wherePivot('type', 'spouse')
-            ->wherePivot('status', 'approved')
-            ->withPivot(['id', 'type', 'status', 'started_at', 'ended_at', 'ended_reason', 'spouse_unit_id']);
-    }
-
-    public function spousesAsObject()
-    {
-        return $this->belongsToMany(
-            Person::class,
-            'relationships',
-            'object_id',
-            'subject_id'
-        )->wherePivot('type', 'spouse')
-            ->wherePivot('status', 'approved')
-            ->withPivot(['id', 'type', 'status', 'started_at', 'ended_at', 'ended_reason', 'spouse_unit_id']);
     }
 }

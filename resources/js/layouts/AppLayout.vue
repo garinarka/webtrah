@@ -114,8 +114,8 @@ const sheetContent = computed(() => {
 
         <BottomNav v-if="ui.isMobile" :items="navigationItems" />
 
-        <!-- fab for moderator/user -->
-        <Fab v-if="auth.isModerator || auth.isUser" :actions="fabActions" />
+        <!-- fab untuk admin, moderator, dan user -->
+        <Fab v-if="auth.isAdmin || auth.isModerator" :actions="fabActions" />
 
         <!-- bottom sheet -->
         <BottomSheet :is-open="!!ui.activeSheet" :title="sheetContent?.title" @close="ui.closeSheet">

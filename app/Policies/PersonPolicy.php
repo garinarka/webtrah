@@ -17,29 +17,27 @@ class PersonPolicy
         return $user->can('view_people');
     }
 
+    /**
+     * User TIDAK bisa membuat data baru.
+     * Hanya admin dan moderator yang bisa tambah anggota.
+     */
     public function create(User $user): bool
     {
         return $user->isAdmin() || $user->isModerator();
     }
 
     /**
-     * admin: siapapun bisa diedit
-     * moderator: bisa edit siapapun dalam family unit
-     * user: hanya bisa edit data yang dia sendiri buat
+     * User hanya bisa edit data yang DIA sendiri buat (via approval queue).
+     * Admin dan moderator bisa edit semua.
      */
     public function update(User $user, Person $person): bool
     {
-        if ($user->isAdmin()) return true;
+        if ($user->isAdmin())     return true;
         if ($user->isModerator()) return true;
-        // user biasa: hanya record yang dia buat sendiri
+        // User biasa: hanya data yang dia buat sendiri
         return $person->created_by === $user->id;
     }
 
-    /**
-     * admin: bisa hapus langsung
-     * moderator: bisa ajukan penghapusan (perlu approval admin)
-     * user: tidak bisa hapus sama sekali
-     */
     public function delete(User $user, Person $person): bool
     {
         return $user->isAdmin() || $user->isModerator();
