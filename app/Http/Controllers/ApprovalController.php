@@ -94,6 +94,9 @@ class ApprovalController extends Controller
             'can' => [
                 'approve' => $user->can('approve', $approval),
                 'reject' => $user->can('reject', $approval),
+                // Pengaju (moderator/user) bisa cancel approvalnya sendiri jika masih pending
+                'cancel' => $approval->status === 'pending'
+                    && ((int) $approval->requested_by === (int) $user->id || $user->isAdmin()),
             ],
         ]);
     }
