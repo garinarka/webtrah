@@ -4,6 +4,7 @@ use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\FamilyUnitController;
+use App\Http\Controllers\ModeratorController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PersonController;
 use App\Http\Controllers\ProfileController;
@@ -42,7 +43,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ── RELATIONSHIPS ─────────────────────────────────────────────────────
     Route::post('/relationships', [RelationshipController::class, 'store'])->name('relationships.store');
     Route::delete('/relationships/{relationship}', [RelationshipController::class, 'destroy'])->name('relationships.destroy');
+    Route::delete('/relationships/{relationship}/cancel', [RelationshipController::class, 'cancel'])->name('relationships.cancel');
     Route::post('/relationships/{relationship}/approve', [RelationshipController::class, 'approve'])->name('relationships.approve');
+    Route::post('/moderator/resign', [ModeratorController::class, 'resign'])->name('moderator.resign');
 
     // ── TREE ──────────────────────────────────────────────────────────────
     Route::get('/tree', [TreeController::class, 'index'])->name('tree');
@@ -51,7 +54,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ── FAMILY UNITS (semua user bisa lihat, hanya admin yg CRUD) ─────────
     Route::get('/family', [FamilyUnitController::class, 'index'])->name('family-units.index');
-    Route::get('/family/{familyUnit}', [FamilyUnitController::class, 'show'])->name('family-units.show');
 });
 
 // Admin + moderator
@@ -60,13 +62,16 @@ Route::middleware(['auth', 'verified', 'role:admin|moderator'])->group(function 
     Route::get('/approvals/{approval}', [ApprovalController::class, 'show'])->name('approvals.show');
     Route::post('/approvals/{approval}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/approvals/{approval}/reject', [ApprovalController::class, 'reject'])->name('approvals.reject');
+    Route::delete('/approvals/{approval}/cancel', [ApprovalController::class, 'cancel'])->name('approvals.cancel');
 });
 
-// Admin only — pakai policy (FamilyUnitPolicy) agar non-admin dapat 403, bukan redirect
+// Family Unit CRUD — gunakan auth middleware; policy di controller enforce siapa yang boleh
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Family Unit CRUD — $this->authorize() di controller yang enforce admin-only
+    // PENTING: /family/create harus SEBELUM /family/{familyUnit}
+    // agar "create" tidak ditangkap sebagai {familyUnit} parameter
     Route::get('/family/create', [FamilyUnitController::class, 'create'])->name('family-units.create');
     Route::post('/family', [FamilyUnitController::class, 'store'])->name('family-units.store');
+    Route::get('/family/{familyUnit}', [FamilyUnitController::class, 'show'])->name('family-units.show');
     Route::get('/family/{familyUnit}/edit', [FamilyUnitController::class, 'edit'])->name('family-units.edit');
     Route::patch('/family/{familyUnit}', [FamilyUnitController::class, 'update'])->name('family-units.update');
     Route::delete('/family/{familyUnit}', [FamilyUnitController::class, 'destroy'])->name('family-units.destroy');

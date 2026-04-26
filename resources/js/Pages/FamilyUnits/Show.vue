@@ -140,6 +140,45 @@ const submitDelRelation = () => {
 
 const getName = (id) =>
     props.members.find((m) => m.id === id)?.display_name ?? '—'
+
+// ── RESIGN MODERATOR ──────────────────────────────────────────────────────
+const showResignModal = ref(false)
+const resignReason = ref('')
+const resignProcessing = ref(false)
+
+const submitResign = () => {
+    if (!resignReason.value || resignReason.value.length < 10) return
+    resignProcessing.value = true
+    router.post(
+        '/moderator/resign',
+        {
+            family_unit_id: props.familyUnit.id,
+            reason: resignReason.value,
+        },
+        {
+            onSuccess: () => {
+                showResignModal.value = false
+                resignReason.value = ''
+            },
+            onFinish: () => {
+                resignProcessing.value = false
+            },
+        },
+    )
+}
+
+// ── CANCEL PENDING RELATION ───────────────────────────────────────────────
+// Relasi pending bisa langsung dihapus tanpa approval admin
+const cancelProcessing = ref(false)
+const cancelPendingRelation = (rel) => {
+    if (cancelProcessing.value) return
+    cancelProcessing.value = true
+    router.delete(`/relationships/${rel.id}/cancel`, {
+        onFinish: () => {
+            cancelProcessing.value = false
+        },
+    })
+}
 </script>
 
 <template>
@@ -206,12 +245,38 @@ const getName = (id) =>
                             </div>
                         </div>
                     </div>
-                    <!-- Admin actions -->
-                    <div
-                        v-if="can.edit"
-                        class="flex flex-shrink-0 items-center gap-2"
-                    >
+                    <!-- Header actions -->
+                    <div class="flex flex-shrink-0 items-center gap-2">
+                        <!-- Tambah Anggota Internal — semua role bisa akses -->
                         <Link
+                            v-if="can.add_member"
+                            :href="`/people/create?family_unit_id=${familyUnit.id}`"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/30"
+                        >
+                            <svg
+                                class="h-3.5 w-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M12 4v16m8-8H4"
+                                />
+                            </svg>
+                            Tambah Anggota
+                        </Link>
+                        <button
+                            v-if="can.can_resign"
+                            @click="showResignModal = true"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-red-500/30 px-3 py-1.5 text-xs font-medium text-red-200 transition-colors hover:bg-red-500/50"
+                        >
+                            Undurkan Diri
+                        </button>
+                        <Link
+                            v-if="can.edit"
                             :href="`/family/${familyUnit.id}/edit`"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-white/30"
                         >
@@ -390,26 +455,46 @@ const getName = (id) =>
                                         {{ statusBadge(rel.status).label }}
                                     </span>
                                 </div>
-                                <button
-                                    v-if="can.manage_relations"
-                                    @click="confirmDelRelation(rel)"
-                                    class="mt-1 flex-shrink-0 p-1 text-gray-300 opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
-                                    title="Hapus relasi"
+                                <div
+                                    class="mt-1 flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100"
                                 >
-                                    <svg
-                                        class="h-3.5 w-3.5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        stroke-width="2"
+                                    <!-- Pending: tampilkan "Batalkan" (hapus langsung tanpa approval) -->
+                                    <button
+                                        v-if="
+                                            rel.status === 'pending' &&
+                                            can.manage_relations
+                                        "
+                                        @click="cancelPendingRelation(rel)"
+                                        class="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-medium text-amber-700 transition-colors hover:bg-amber-100"
+                                        title="Batalkan pengajuan relasi ini"
                                     >
-                                        <path
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            d="M6 18L18 6M6 6l12 12"
-                                        />
-                                    </svg>
-                                </button>
+                                        Batalkan
+                                    </button>
+                                    <!-- Approved: tombol hapus biasa (butuh approval admin) -->
+                                    <button
+                                        v-else-if="
+                                            rel.status === 'approved' &&
+                                            can.manage_relations
+                                        "
+                                        @click="confirmDelRelation(rel)"
+                                        class="p-1 text-gray-300 transition-colors hover:text-red-500"
+                                        title="Ajukan penghapusan relasi"
+                                    >
+                                        <svg
+                                            class="h-3.5 w-3.5"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                            stroke-width="2"
+                                        >
+                                            <path
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                d="M6 18L18 6M6 6l12 12"
+                                            />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -597,6 +682,58 @@ const getName = (id) =>
                         >
                             {{
                                 delRelProcessing ? 'Menghapus...' : 'Ya, Hapus'
+                            }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+        <!-- Resign modal -->
+        <Teleport to="body">
+            <div
+                v-if="showResignModal"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            >
+                <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                    <h3 class="text-base font-semibold text-gray-900">
+                        Ajukan Pengunduran Diri?
+                    </h3>
+                    <p class="mb-4 mt-1 text-sm text-gray-500">
+                        Pengunduran diri dari unit
+                        <span class="font-medium">{{ familyUnit.name }}</span>
+                        memerlukan persetujuan admin sebelum berlaku.
+                    </p>
+                    <div>
+                        <label
+                            class="mb-1 block text-xs font-medium text-gray-700"
+                        >
+                            Alasan <span class="text-red-500">*</span>
+                        </label>
+                        <textarea
+                            v-model="resignReason"
+                            rows="3"
+                            placeholder="Minimal 10 karakter..."
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-200"
+                        />
+                    </div>
+                    <div class="mt-5 flex justify-end gap-3">
+                        <button
+                            @click="showResignModal = false"
+                            class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            @click="submitResign"
+                            :disabled="
+                                resignProcessing || resignReason.length < 10
+                            "
+                            class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                        >
+                            {{
+                                resignProcessing
+                                    ? 'Mengirim...'
+                                    : 'Ajukan Pengunduran Diri'
                             }}
                         </button>
                     </div>

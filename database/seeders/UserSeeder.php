@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -24,8 +23,22 @@ class UserSeeder extends Seeder
 
         // moderator
         $moderator = User::create([
+            'name' => 'Moderator Pusat',
+            'email' => 'pusat.mod@family.test',
+            'password' => Hash::make('password123'),
+        ]);
+        $moderator->assignRole('moderator');
+
+        $moderator = User::create([
             'name' => 'Moderator Cabang',
-            'email' => 'moderator@family.test',
+            'email' => 'cabang.mod@family.test',
+            'password' => Hash::make('password123'),
+        ]);
+        $moderator->assignRole('moderator');
+
+        $moderator = User::create([
+            'name' => 'Moderator Kosong',
+            'email' => 'kosong.mod@family.test',
             'password' => Hash::make('password123'),
         ]);
         $moderator->assignRole('moderator');

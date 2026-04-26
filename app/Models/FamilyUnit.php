@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
@@ -48,5 +49,18 @@ class FamilyUnit extends Model
     public function people(): HasMany
     {
         return $this->hasMany(Person::class);
+    }
+
+    /**
+     * Semua moderator yang di-assign ke unit ini via pivot table moderator_family_units.
+     */
+    public function assignedModerators(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            User::class,
+            'moderator_family_units',
+            'family_unit_id',
+            'user_id'
+        )->withTimestamps();
     }
 }

@@ -1,20 +1,35 @@
 <script setup>
 // Dipakai untuk Create DAN Edit — bedanya hanya props yang diterima
 import { ref, computed } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 
 const props = defineProps({
     familyUnit: { type: Object, default: null }, // null = create mode
     moderators: { type: Array, default: () => [] },
+    currentModeratorIds: { type: Array, default: () => [] }, // IDs moderator yang sudah dipilih
 })
 
 const isEdit = !!props.familyUnit
 
+// ID user yang sedang login — moderator tidak bisa memilih dirinya sendiri
+const page = usePage()
+const currentUserId = computed(() => page.props.auth?.user?.id)
+
+// Helper: apakah moderator ini di-disable di daftar pilihan?
+const isModeratorDisabled = (mod) => {
+    // Di-disable kalau: (1) sudah max 3 dan belum dipilih, ATAU (2) ini adalah akun diri sendiri
+    const maxReached =
+        !form.moderator_ids.includes(mod.id) && form.moderator_ids.length >= 3
+    const isSelf = String(mod.id) === String(currentUserId.value)
+    return maxReached || isSelf
+}
+
+// Ambil IDs moderator saat ini dari relasi pivot (dikirim via prop moderatorIds)
 const form = useForm({
     name: props.familyUnit?.name ?? '',
     description: props.familyUnit?.description ?? '',
-    moderator_id: props.familyUnit?.moderator_id ?? '',
+    moderator_ids: props.currentModeratorIds ?? [], // array, max 3
 })
 
 // Deteksi perubahan saat edit mode
@@ -22,11 +37,12 @@ const noChangesWarning = ref(false)
 
 const hasChanges = computed(() => {
     if (!isEdit) return true
+    const origIds = [...(props.currentModeratorIds ?? [])].sort().join(',')
+    const formIds = [...(form.moderator_ids ?? [])].sort().join(',')
     return (
-        form.name !== (props.familyUnit.name ?? '') ||
-        form.description !== (props.familyUnit.description ?? '') ||
-        String(form.moderator_id ?? '') !==
-            String(props.familyUnit.moderator_id ?? '')
+        form.name !== (props.familyUnit?.name ?? '') ||
+        form.description !== (props.familyUnit?.description ?? '') ||
+        formIds !== origIds
     )
 })
 
@@ -138,41 +154,79 @@ const submit = () => {
                         </p>
                     </div>
 
-                    <!-- Moderator -->
+                    <!-- Moderator (multi-select, max 3) -->
                     <div>
                         <label
                             class="mb-1.5 block text-sm font-medium text-gray-700"
-                            >Moderator</label
                         >
-                        <select
-                            v-model="form.moderator_id"
-                            :class="[
-                                'w-full rounded-lg border bg-white px-4 py-2.5 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300',
-                                form.errors.moderator_id
-                                    ? 'border-red-300'
-                                    : 'border-gray-300',
-                            ]"
+                            Moderator
+                            <span class="ml-1 text-xs font-normal text-gray-400"
+                                >({{ form.moderator_ids.length }}/3
+                                dipilih)</span
+                            >
+                        </label>
+
+                        <div
+                            v-if="moderators.length === 0"
+                            class="rounded-lg border border-dashed border-gray-200 py-3 text-center text-sm italic text-gray-400"
                         >
-                            <option value="">
-                                Tidak ada moderator (opsional)
-                            </option>
-                            <option
+                            Belum ada akun dengan role moderator.
+                        </div>
+
+                        <div
+                            v-else
+                            class="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3"
+                        >
+                            <label
                                 v-for="mod in moderators"
                                 :key="mod.id"
-                                :value="mod.id"
+                                :class="[
+                                    'flex items-center gap-3 rounded-lg p-2 transition-colors',
+                                    isModeratorDisabled(mod)
+                                        ? 'cursor-not-allowed opacity-40'
+                                        : 'cursor-pointer',
+                                    form.moderator_ids.includes(mod.id)
+                                        ? 'border border-indigo-200 bg-indigo-50'
+                                        : 'border border-transparent hover:bg-gray-50',
+                                ]"
                             >
-                                {{ mod.name }} — {{ mod.email }}
-                            </option>
-                        </select>
+                                <input
+                                    type="checkbox"
+                                    :value="mod.id"
+                                    v-model="form.moderator_ids"
+                                    :disabled="isModeratorDisabled(mod)"
+                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <div class="min-w-0 flex-1">
+                                    <p
+                                        class="truncate text-sm font-medium text-gray-900"
+                                    >
+                                        {{ mod.name }}
+                                        <span
+                                            v-if="
+                                                String(mod.id) ===
+                                                String(currentUserId)
+                                            "
+                                            class="ml-1 text-xs font-normal text-gray-400"
+                                            >(kamu)</span
+                                        >
+                                    </p>
+                                    <p class="truncate text-xs text-gray-400">
+                                        {{ mod.email }}
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+
                         <p class="mt-1 text-xs text-gray-400">
-                            Moderator bisa mengelola data anggota di unit ini
-                            (perlu persetujuan admin).
+                            Maksimal 3 moderator per unit. Moderator yang
+                            dipilih bisa mengelola data anggota di unit ini.
                         </p>
                         <p
-                            v-if="form.errors.moderator_id"
+                            v-if="form.errors.moderator_ids"
                             class="mt-1 text-xs text-red-600"
                         >
-                            {{ form.errors.moderator_id }}
+                            {{ form.errors.moderator_ids }}
                         </p>
                     </div>
                 </div>

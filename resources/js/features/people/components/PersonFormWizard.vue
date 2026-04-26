@@ -1,5 +1,5 @@
 <script setup>
-import { watch, onMounted, onBeforeUnmount, ref, computed } from 'vue'
+import { watch, computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { usePersonForm } from '../composables/usePersonForm.js'
 import { useAutoSave } from '../composables/useAutoSave.js'
@@ -11,18 +11,20 @@ import StepReview from './steps/StepReview.vue'
 const props = defineProps({
     initialData: { type: Object, default: () => ({}) },
     familyUnits: { type: Array, default: () => [] },
-    allPeople: { type: Array, default: () => [] }, // untuk seksi relasi di StepFamily
+    allPeople: { type: Array, default: () => [] },
     isEditMode: { type: Boolean, default: false },
-    isDraftMode: { type: Boolean, default: false }, // true = datang dari /people/drafts
+    isDraftMode: { type: Boolean, default: false },
+    lockedFamilyUnitId: { type: String, default: null },
     personId: { type: String, default: null },
     submitRoute: { type: String, required: true },
     submitMethod: { type: String, default: 'post' },
 })
 
 const emit = defineEmits(['submitted'])
-
 const page = usePage()
 const isAdmin = computed(() => page.props.auth?.user?.role === 'admin')
+
+// ── FORM SETUP ────────────────────────────────────────────────────────────────
 
 const {
     form,
@@ -41,7 +43,9 @@ const {
 } = usePersonForm({
     ...props.initialData,
     family_unit_id:
-        props.initialData?.family_unit_id ?? props.familyUnits[0]?.id,
+        props.lockedFamilyUnitId ??
+        props.initialData?.family_unit_id ??
+        props.familyUnits[0]?.id,
     isEditMode: props.isEditMode,
     isAdmin: () => isAdmin.value,
 })
@@ -50,12 +54,54 @@ const {
     isSaving,
     lastSavedAt,
     hasUnsavedChanges,
-    saveError,
     scheduleSave,
     clearDraft,
     savedAtFormatted,
     loadFromLocal,
 } = useAutoSave(form, currentStep)
+
+// ── STEP FILTERING ────────────────────────────────────────────────────────────
+// Kalau lockedFamilyUnitId ada → skip step "family" (sudah pasti unitnya)
+
+const ALL_STEP_COMPONENTS = [StepBasicInfo, StepDates, StepFamily, StepReview]
+const ALL_STEP_KEYS = ['basic', 'dates', 'family', 'review']
+
+const visibleStepKeys = computed(() =>
+    props.lockedFamilyUnitId
+        ? ALL_STEP_KEYS.filter((k) => k !== 'family')
+        : ALL_STEP_KEYS,
+)
+
+// Map currentStep → komponen yang benar sesuai visibleStepKeys
+const currentStepComponent = computed(() => {
+    const key = visibleStepKeys.value[currentStep.value - 1]
+    const idx = ALL_STEP_KEYS.indexOf(key)
+    return ALL_STEP_COMPONENTS[idx] ?? StepBasicInfo
+})
+
+// stepStatus hanya untuk step yang terlihat
+// id di-remap ke posisi urutan (1, 2, 3) bukan ID asli step (1, 2, 3, 4)
+// agar progress indicator dan navigasi selalu menampilkan nomor berurut yang benar
+const visibleStepStatus = computed(() =>
+    stepStatus.value
+        .filter((s) => visibleStepKeys.value.includes(s.key))
+        .map((s, index) => ({
+            ...s,
+            id: index + 1,
+            current: currentStep.value === index + 1,
+            completed: s.completed && currentStep.value > index + 1,
+        })),
+)
+
+const totalSteps = computed(() => visibleStepKeys.value.length)
+
+// Terjemahkan posisi step saat ini (1-based positional) ke ID asli STEPS (1,2,3,4).
+// Diperlukan karena usePersonForm.js menyimpan step dengan ID tetap (1=basic, 2=dates, 3=family, 4=review)
+// sedangkan currentStep adalah posisi urutan yang terlihat (1,2,3 untuk 3-step mode).
+const actualStepId = computed(() => {
+    const key = visibleStepKeys.value[currentStep.value - 1]
+    return ALL_STEP_KEYS.indexOf(key) + 1
+})
 
 // ── DRAFT RESTORE ─────────────────────────────────────────────────────────────
 
@@ -81,7 +127,8 @@ const restoreLocalDraft = () => {
     if (d.birth_accuracy) form.birth_accuracy = d.birth_accuracy
     if (d.death_date) form.death_date = d.death_date
     if (d.death_accuracy) form.death_accuracy = d.death_accuracy
-    if (d.family_unit_id) form.family_unit_id = d.family_unit_id
+    if (!props.lockedFamilyUnitId && d.family_unit_id)
+        form.family_unit_id = d.family_unit_id
     if (d.current_step) currentStep.value = d.current_step
     showDraftRestore.value = false
 }
@@ -96,10 +143,8 @@ const dismissDraft = () => {
 const noChangesWarning = ref(false)
 
 const hasChanges = computed(() => {
-    // Draft mode: TIDAK perlu cek perubahan — selalu izinkan submit
     if (props.isDraftMode) return true
     if (!props.isEditMode || !props.initialData) return true
-
     const tracked = [
         'display_name',
         'gender',
@@ -111,7 +156,6 @@ const hasChanges = computed(() => {
     ]
     return tracked.some((field) => {
         let original = props.initialData[field] ?? ''
-        // Bandingkan nilai yang sudah diformat (apple-to-apple)
         if (field === 'birth_date') original = initBirthDate
         else if (field === 'death_date') original = initDeathDate
         return String(original) !== String(form[field] ?? '')
@@ -121,16 +165,15 @@ const hasChanges = computed(() => {
 // ── AUTO-SAVE ─────────────────────────────────────────────────────────────────
 
 watch(
-    () =>
-        form.data?.() ?? {
-            display_name: form.display_name,
-            gender: form.gender,
-            birth_date: form.birth_date,
-            birth_accuracy: form.birth_accuracy,
-            death_date: form.death_date,
-            death_accuracy: form.death_accuracy,
-            family_unit_id: form.family_unit_id,
-        },
+    () => ({
+        display_name: form.display_name,
+        gender: form.gender,
+        birth_date: form.birth_date,
+        birth_accuracy: form.birth_accuracy,
+        death_date: form.death_date,
+        death_accuracy: form.death_accuracy,
+        family_unit_id: form.family_unit_id,
+    }),
     () => {
         if (!props.isEditMode) scheduleSave()
     },
@@ -140,38 +183,29 @@ watch(
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 
 const handleNext = () => {
-    nextStep()
+    // nextStep() dari usePersonForm memvalidasi currentStep.value yang merupakan ID asli STEPS
+    // Kita inject actual step ID agar validasi sesuai step yang benar-benar aktif
+    if (validateStep(actualStepId.value)) {
+        currentStep.value++
+    }
 }
 const handlePrev = () => {
-    prevStep()
+    if (currentStep.value > 1) currentStep.value--
 }
 
-// ── SUBMIT HANDLERS ───────────────────────────────────────────────────────────
+// ── SUBMIT ────────────────────────────────────────────────────────────────────
 
-/**
- * submitAsSubmit: tombol utama
- * - Mode edit biasa: cek hasChanges, submit dengan is_draft=false
- * - Mode draft (isDraftMode): SKIP cek hasChanges
- *   - Admin: kirim dengan is_draft=false → server set status='active'
- *   - Moderator: kirim dengan is_draft=false → server buat approval 'create', status='pending'
- */
 const submitAsSubmit = () => {
     if (props.isEditMode && !props.isDraftMode && !hasChanges.value) {
         noChangesWarning.value = true
         return
     }
     noChangesWarning.value = false
-
-    if (!validateStep(currentStep.value)) return
+    if (!validateStep(actualStepId.value)) return
     form.is_draft = false
     submitForm()
 }
 
-/**
- * submitAsDraft: tombol sekunder
- * - Mode create biasa: simpan sebagai draft baru
- * - Mode draft (isDraftMode): update form fields, pertahankan status='draft'
- */
 const submitAsDraft = () => {
     form.is_draft = true
     submitForm()
@@ -187,7 +221,7 @@ const submitForm = () => {
     })
 }
 
-// ── PREVENT UNLOAD ────────────────────────────────────────────────────────────
+// ── UNLOAD GUARD ──────────────────────────────────────────────────────────────
 
 const handleBeforeUnload = (e) => {
     if (hasUnsavedChanges.value) {
@@ -203,33 +237,23 @@ onBeforeUnmount(() =>
 // ── LABELS ────────────────────────────────────────────────────────────────────
 
 const submitLabel = computed(() => {
-    if (props.isDraftMode) {
-        // Mode draft → tombol utama publikasikan data
+    if (props.isDraftMode)
         return isAdmin.value ? 'Simpan & Aktifkan' : 'Ajukan ke Admin'
-    }
-    if (props.isEditMode) {
+    if (props.isEditMode)
         return isAdmin.value ? 'Simpan Perubahan' : 'Ajukan Perubahan'
-    }
     return isAdmin.value ? 'Tambah Anggota' : 'Ajukan Permohonan'
 })
 
-// Tombol "Simpan Draft" di step 4 tampil ketika:
-// - Create mode (bukan edit): selalu ada
-// - Draft mode: ada (untuk update tanpa publish)
 const showDraftButton = computed(
     () =>
-        currentStep.value === steps.length &&
+        currentStep.value === totalSteps.value &&
         (!props.isEditMode || props.isDraftMode),
 )
-
-// ── STEP COMPONENTS ───────────────────────────────────────────────────────────
-
-const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
 </script>
 
 <template>
     <div class="mx-auto max-w-2xl">
-        <!-- Draft restore banner (create mode only) -->
+        <!-- Draft restore banner -->
         <Transition
             enter-active-class="transition ease-out duration-300"
             enter-from-class="opacity-0 -translate-y-4"
@@ -286,9 +310,7 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
                         Tidak Ada Perubahan
                     </p>
                     <p class="mt-0.5 text-xs text-yellow-700">
-                        Data tidak disimpan karena tidak ada perubahan yang
-                        terdeteksi. Ubah setidaknya satu field sebelum
-                        menyimpan.
+                        Ubah setidaknya satu field sebelum menyimpan.
                     </p>
                 </div>
             </div>
@@ -302,11 +324,11 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
                 >
                     <div
                         class="h-full bg-indigo-500 transition-all duration-500 ease-out"
-                        :style="`width: ${((currentStep - 1) / (steps.length - 1)) * 100}%`"
+                        :style="`width: ${totalSteps > 1 ? ((currentStep - 1) / (totalSteps - 1)) * 100 : 0}%`"
                     />
                 </div>
                 <button
-                    v-for="step in stepStatus"
+                    v-for="step in visibleStepStatus"
                     :key="step.id"
                     @click="goToStep(step.id)"
                     :disabled="step.id > currentStep"
@@ -383,12 +405,12 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
                 </svg>
                 Menyimpan...
             </template>
-            <template v-else-if="lastSavedAt">
-                ✓ Tersimpan otomatis {{ savedAtFormatted }}
-            </template>
-            <template v-else>
-                Draft akan tersimpan otomatis saat Anda mengetik
-            </template>
+            <template v-else-if="lastSavedAt"
+                >✓ Tersimpan otomatis {{ savedAtFormatted }}</template
+            >
+            <template v-else
+                >Draft akan tersimpan otomatis saat Anda mengetik</template
+            >
         </div>
 
         <!-- Card -->
@@ -398,11 +420,12 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
             <!-- Step content -->
             <div class="p-6 md:p-8">
                 <component
-                    :is="stepComponents[currentStep - 1]"
+                    :is="currentStepComponent"
                     :key="currentStep"
                     :form="form"
                     :errors="allErrors"
                     :family-units="familyUnits"
+                    :all-people="allPeople"
                     :gender-label="genderLabel"
                     :accuracy-label="accuracyLabel"
                     :is-edit-mode="isEditMode"
@@ -414,7 +437,6 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
             <div
                 class="flex items-center justify-between border-t border-gray-100 bg-gray-50/50 px-6 py-4 md:px-8"
             >
-                <!-- Left: back -->
                 <button
                     v-if="currentStep > 1"
                     type="button"
@@ -438,9 +460,8 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
                 </button>
                 <div v-else />
 
-                <!-- Right: draft + next/submit -->
                 <div class="flex items-center gap-3">
-                    <!-- Simpan Draft — tampil di step 4 create mode ATAU draft mode -->
+                    <!-- Simpan Draft -->
                     <button
                         v-if="showDraftButton"
                         type="button"
@@ -466,7 +487,7 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
 
                     <!-- Next -->
                     <button
-                        v-if="currentStep < steps.length"
+                        v-if="currentStep < totalSteps"
                         type="button"
                         @click="handleNext"
                         class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
@@ -487,7 +508,7 @@ const stepComponents = [StepBasicInfo, StepDates, StepFamily, StepReview]
                         </svg>
                     </button>
 
-                    <!-- Submit utama -->
+                    <!-- Submit -->
                     <button
                         v-else
                         type="button"

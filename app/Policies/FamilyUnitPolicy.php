@@ -7,7 +7,6 @@ use App\Models\User;
 
 class FamilyUnitPolicy
 {
-    /** Semua user login bisa lihat daftar unit keluarga */
     public function viewAny(User $user): bool
     {
         return true;
@@ -18,19 +17,27 @@ class FamilyUnitPolicy
         return true;
     }
 
-    /** Hanya admin yang bisa buat unit keluarga */
     public function create(User $user): bool
     {
         return $user->isAdmin();
     }
 
-    /** Hanya admin yang bisa edit unit keluarga */
+    /**
+     * Admin: semua unit.
+     * Moderator: hanya unit yang mereka naungi (via pivot).
+     */
     public function update(User $user, FamilyUnit $familyUnit): bool
     {
-        return $user->isAdmin();
+        if ($user->isAdmin()) {
+            return true;
+        }
+        if ($user->isModerator()) {
+            return $user->managesUnit($familyUnit->id);
+        }
+
+        return false;
     }
 
-    /** Hanya admin yang bisa hapus unit keluarga */
     public function delete(User $user, FamilyUnit $familyUnit): bool
     {
         return $user->isAdmin();

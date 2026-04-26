@@ -61,7 +61,12 @@ const bodyClasses = computed(() => {
 const fabActions = computed(() => {
     const actions = []
 
-    if (auth.can('create_person')) {
+    // Moderator hanya bisa tambah anggota jika sudah di-assign ke minimal 1 unit
+    const canCreate =
+        auth.isAdmin ||
+        (auth.isModerator && auth.managedFamilyUnitIds?.length > 0)
+
+    if (canCreate && auth.can('create_person')) {
         actions.push({
             id: 'person',
             label: 'Tambah Anggota',
