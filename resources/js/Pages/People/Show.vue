@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
+import RelationshipsPanel from '@/Pages/People/Partials/RelationshipsPanel.vue'
 
 const props = defineProps({
     person: Object,
@@ -437,6 +438,20 @@ const eventColor = (event) =>
                     </dl>
                 </div>
             </div>
+
+            <!-- Relasi Keluarga -->
+            <RelationshipsPanel
+                v-if="
+                    can.manage_relations ||
+                    relationships.parents.length ||
+                    relationships.children.length ||
+                    relationships.spouses.length
+                "
+                :person-id="person.id"
+                :relationships="relationships"
+                :people-list="peopleList"
+                :can="can"
+            />
 
             <!-- Audit Log -->
             <div
