@@ -40,7 +40,7 @@ const getIconPath = (iconKey) => iconPaths[iconKey] ?? iconPaths['Home']
         <button
             @click="$emit('toggle')"
             class="flex flex-shrink-0 items-center p-4 text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
-            :class="open ? 'justify-end' : 'justify-center'"
+            :class="open ? 'justify-end' : 'justify-start'"
             :title="open ? 'Tutup sidebar' : 'Buka sidebar'"
         >
             <!-- Collapse icon -->

@@ -35,7 +35,12 @@ class ApprovalPolicy
         }
 
         if ($user->isModerator()) {
-            if (!$user->can('approve_changes')) {
+            if (! $user->can('approve_changes')) {
+                return false;
+            }
+
+            // Resign moderator: approvable null — hanya admin yang bisa approve
+            if ($approval->action === 'resign_moderator') {
                 return false;
             }
 
@@ -47,7 +52,9 @@ class ApprovalPolicy
                 return false;
             }
 
-            return (int) $user->family_unit_id === (int) $approvable->family_unit_id;
+            // Gunakan managesUnit() yang sudah menggunakan raw DB query
+            // agar tidak ada bug kolom 'family_unit_id' yang sudah dihapus dari tabel users
+            return $user->managesUnit($approvable->family_unit_id);
         }
 
         return false;
@@ -62,18 +69,22 @@ class ApprovalPolicy
     {
         return false;
     }
+
     public function update(User $user, Approval $approval): bool
     {
         return false;
     }
+
     public function delete(User $user, Approval $approval): bool
     {
         return false;
     }
+
     public function restore(User $user, Approval $approval): bool
     {
         return false;
     }
+
     public function forceDelete(User $user, Approval $approval): bool
     {
         return false;

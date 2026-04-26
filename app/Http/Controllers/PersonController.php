@@ -140,23 +140,36 @@ class PersonController extends Controller
             ->orderBy('display_name')
             ->get(['id', 'display_name', 'gender', 'birth_date']);
 
+        // Cari approval pending milik user ini untuk person ini
+        // Digunakan agar tombol "Batalkan Pengajuan" hanya muncul jika ada
+        $pendingApproval = Approval::where('approvable_type', Person::class)
+            ->where('approvable_id', $person->id)
+            ->where('requested_by', $user->id)
+            ->where('status', 'pending')
+            ->whereIn('action', ['create', 'update', 'delete'])
+            ->latest()
+            ->first();
+
         return Inertia::render('People/Show', [
             'person' => $person->load(['familyUnit', 'creator']),
             'auditLogs' => $auditLogs,
             'relationships' => compact('parents', 'children', 'spouses', 'pending'),
             'peopleList' => $peoplelist,
+            'pendingApprovalId' => $pendingApproval?->id,
             'can' => [
                 'edit' => $user->can('update', $person),
                 'delete' => $user->can('delete', $person),
                 'manage_relations' => $user->isAdmin() || $user->isModerator(),
                 'approve_relations' => $user->isAdmin(),
+                // Tombol batalkan pengajuan: muncul jika ada approval pending milik user ini
+                'cancel_approval' => $pendingApproval !== null,
             ],
         ]);
     }
 
     // ─── CREATE FORM ───────────────────────────────────────────────────────
 
-    public function create()
+    public function create(Request $request)
     {
         $this->authorize('create', Person::class);
 
@@ -169,11 +182,27 @@ class PersonController extends Controller
             ->orderBy('display_name')
             ->get(['id', 'display_name', 'gender', 'birth_date', 'family_unit_id']);
 
+        // Jika dibuka dari /people/create?family_unit_id={id}
+        // (misalnya dari halaman Show unit keluarga), kunci unit keluarganya.
+        // Ini juga memastikan approval yang dibuat moderator masuk ke unit yang benar
+        // sehingga bisa terlihat di /approvals oleh moderator itu sendiri.
+        $lockedFamilyUnitId = null;
+        $lockedFamilyUnit = null;
+        if ($request->filled('family_unit_id')) {
+            $unit = FamilyUnit::find($request->family_unit_id);
+            if ($unit) {
+                $lockedFamilyUnitId = $unit->id;
+                $lockedFamilyUnit = $unit->only(['id', 'name']);
+            }
+        }
+
         return Inertia::render('People/Create', [
             'familyUnits' => $familyUnits,
             'allPeople' => $allPeople,
             'savedDraft' => $savedDraft,
-            'defaultFamilyUnitId' => $familyUnits->first()?->id,
+            'defaultFamilyUnitId' => $lockedFamilyUnitId ?? $familyUnits->first()?->id,
+            'lockedFamilyUnitId' => $lockedFamilyUnitId,
+            'lockedFamilyUnit' => $lockedFamilyUnit,
         ]);
     }
 
@@ -188,7 +217,7 @@ class PersonController extends Controller
         DB::beginTransaction();
         try {
             $status = $user->isAdmin() && ! $isDraft ? 'active'
-                : ($isDraft ? 'draft' : 'pending');
+                    : ($isDraft ? 'draft' : 'pending');
 
             $person = Person::create([
                 'family_unit_id' => $data['family_unit_id'],
@@ -311,7 +340,7 @@ class PersonController extends Controller
         $data = $request->validated();
         $isDraft = $data['is_draft'] ?? false;
         $isDraftMode = $person->status === 'draft'; // person saat ini masih draft
-        $trackableFields = ['display_name', 'gender', 'birth_date', 'birth_accuracy', 'death_date', 'death_accuracy', 'family_unit_id'];
+        $trackableFields = ['display_name', 'gender', 'birth_date', 'birth_accuracy', 'death_date', 'death_accuracy'];
         $user = auth()->user();
 
         DB::beginTransaction();
@@ -490,9 +519,7 @@ class PersonController extends Controller
 
                 if ($user->isAdmin()) {
                     AuditLog::record($person, 'deleted', $person->toArray(), [
-                        'deleted_by' => $user->name,
-                        'reason' => $request->reason,
-                        'bulk' => true,
+                        'deleted_by' => $user->name, 'reason' => $request->reason, 'bulk' => true,
                     ]);
                     $person->delete();
                     $deleted++;
@@ -506,8 +533,7 @@ class PersonController extends Controller
                         'requested_by' => $user->id,
                     ]);
                     AuditLog::record($person, 'delete_requested', $person->toArray(), [
-                        'reason' => $request->reason,
-                        'bulk' => true,
+                        'reason' => $request->reason, 'bulk' => true,
                     ]);
                     $pending++;
                 }

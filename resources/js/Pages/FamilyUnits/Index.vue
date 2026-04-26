@@ -5,8 +5,14 @@ import AppLayout from '@/layouts/AppLayout.vue'
 
 const props = defineProps({
     familyUnits: Array,
+    editableUnitIds: { type: Array, default: () => [] }, // server-computed, reliable
     can: Object,
 })
+
+// Apakah user ini bisa edit unit keluarga tertentu?
+// Admin: semua unit. Moderator: hanya unit yang dia naungi.
+// Gunakan editableUnitIds dari server (bukan auth store) agar tidak ada race condition
+const canEditUnit = (unit) => props.editableUnitIds.includes(unit.id)
 
 const showDeleteModal = ref(false)
 const deleteTarget = ref(null)
@@ -156,7 +162,7 @@ const submitDelete = () => {
                             {{ unit.people_count ?? 0 }} anggota
                         </span>
                         <span
-                            v-if="unit.moderator?.name"
+                            v-if="unit.assigned_moderators?.length"
                             class="flex items-center gap-1"
                         >
                             <svg
@@ -172,7 +178,12 @@ const submitDelete = () => {
                                     d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
                                 />
                             </svg>
-                            {{ unit.moderator.name }}
+                            <span v-if="unit.assigned_moderators.length === 1">
+                                {{ unit.assigned_moderators[0].name }}
+                            </span>
+                            <span v-else>
+                                {{ unit.assigned_moderators.length }} moderator
+                            </span>
                         </span>
                         <span v-else class="italic text-gray-400"
                             >Belum ada moderator</span
@@ -180,12 +191,14 @@ const submitDelete = () => {
                     </div>
 
                     <!-- Actions -->
+                    <!-- Edit button: admin semua, moderator hanya unitnya, others = locked -->
                     <div
-                        v-if="can.edit || can.delete"
+                        v-if="can.edit"
                         class="flex items-center gap-2 border-t border-gray-100 pt-2"
                     >
+                        <!-- Admin atau moderator yang terikat: tombol edit aktif -->
                         <Link
-                            v-if="can.edit"
+                            v-if="canEditUnit(unit)"
                             :href="`/family/${unit.id}/edit`"
                             class="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100"
                         >
@@ -204,6 +217,28 @@ const submitDelete = () => {
                             </svg>
                             Edit
                         </Link>
+                        <!-- Moderator lain atau tanpa unit: tombol terkunci -->
+                        <div
+                            v-else-if="can.edit"
+                            class="inline-flex flex-1 cursor-not-allowed select-none items-center justify-center gap-1.5 rounded-lg border border-gray-100 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-300"
+                            title="Kamu tidak terikat dengan unit keluarga ini"
+                        >
+                            <svg
+                                class="h-3.5 w-3.5"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                stroke-width="2"
+                            >
+                                <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+                                />
+                            </svg>
+                            Akses Terbatas
+                        </div>
+                        <!-- Delete: admin only -->
                         <button
                             v-if="can.delete"
                             @click="confirmDelete(unit)"
