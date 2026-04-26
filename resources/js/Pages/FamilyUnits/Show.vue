@@ -233,11 +233,32 @@ const cancelPendingRelation = (rel) => {
                                 class="mt-2 flex items-center gap-4 text-sm text-indigo-100"
                             >
                                 <span>{{ members.length }} anggota aktif</span>
-                                <span v-if="familyUnit.moderator">
+                                <span
+                                    v-if="
+                                        familyUnit.assigned_moderators?.length
+                                    "
+                                >
                                     · Moderator:
-                                    <span class="font-semibold text-white">{{
-                                        familyUnit.moderator.name
-                                    }}</span>
+                                    <span class="font-semibold text-white">
+                                        <template
+                                            v-if="
+                                                familyUnit.assigned_moderators
+                                                    .length === 1
+                                            "
+                                        >
+                                            {{
+                                                familyUnit
+                                                    .assigned_moderators[0].name
+                                            }}
+                                        </template>
+                                        <template v-else>
+                                            {{
+                                                familyUnit.assigned_moderators
+                                                    .length
+                                            }}
+                                            moderator
+                                        </template>
+                                    </span>
                                 </span>
                                 <span v-else class="italic text-indigo-300"
                                     >· Belum ada moderator</span

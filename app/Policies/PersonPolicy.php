@@ -19,7 +19,10 @@ class PersonPolicy
 
     public function create(User $user): bool
     {
-        return $user->isAdmin() || $user->isModerator();
+        // Gunakan permission 'create_person' agar konsisten dengan sistem RBAC Spatie.
+        // Admin & Moderator punya permission ini (seeder), User biasa tidak.
+        // Ini lebih clean daripada hardcode isAdmin || isModerator.
+        return $user->can('create_person');
     }
 
     public function update(User $user, Person $person): bool

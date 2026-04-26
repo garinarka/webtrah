@@ -25,11 +25,16 @@ class RelationshipPolicy
         if ($user->isModerator()) {
             $subjectUnit = $relationship->subject?->family_unit_id;
             $objectUnit = $relationship->object?->family_unit_id;
-            if (! $subjectUnit || ! $objectUnit) {
+
+            // Jika salah satu person tidak punya unit, hanya admin yang bisa hapus
+            if (! $subjectUnit && ! $objectUnit) {
                 return false;
             }
 
-            return $user->managesUnit($subjectUnit) && $user->managesUnit($objectUnit);
+            // Cukup mengelola SALAH SATU dari kedua unit yang terlibat.
+            // Syarat "harus kelola keduanya" terlalu ketat — jika subject & object
+            // berasal dari unit berbeda, tidak ada moderator tunggal yang bisa memenuhinya.
+            return $user->managesUnit($subjectUnit) || $user->managesUnit($objectUnit);
         }
 
         return false;

@@ -75,7 +75,7 @@ class FamilyUnitController extends Controller
             || ($user->isModerator() && $user->managesUnit($familyUnit->id));
 
         return Inertia::render('FamilyUnits/Show', [
-            'familyUnit' => $familyUnit->load('moderator:id,name'),
+            'familyUnit' => $familyUnit->load('assignedModerators:id,name'),
             'members' => $members,
             'relationships' => $relationships,
             'can' => [

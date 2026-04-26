@@ -67,12 +67,20 @@ const fabActions = computed(() => {
         (auth.isModerator && auth.managedFamilyUnitIds?.length > 0)
 
     if (canCreate && auth.can('create_person')) {
+        // Jika moderator hanya kelola 1 unit, langsung arahkan ke form dengan unit terkunci.
+        // Jika admin atau moderator multi-unit, buka form umum (dropdown unit tersedia).
+        const unitIds = auth.managedFamilyUnitIds
+        const targetUrl =
+            auth.isModerator && !auth.isAdmin && unitIds?.length === 1
+                ? `/people/create?family_unit_id=${unitIds[0]}`
+                : '/people/create'
+
         actions.push({
             id: 'person',
             label: 'Tambah Anggota',
             icon: '👤',
             permission: 'create_person',
-            onClick: () => (window.location.href = '/people/create'),
+            onClick: () => (window.location.href = targetUrl),
         })
     }
 
