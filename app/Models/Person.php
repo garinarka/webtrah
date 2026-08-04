@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Person extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
         'family_unit_id',
@@ -26,7 +26,7 @@ class Person extends Model
 
     /**
      * Cast 'date:Y-m-d' — serialize ke JSON sebagai "YYYY-MM-DD" bukan ISO timestamp.
-     * 
+     *
      * Sebelumnya cast 'date' menyebabkan Carbon serialize ke "2007-09-14T17:00:00.000000Z"
      * (UTC midnight dari timezone Asia/Jakarta) sehingga frontend menerima tanggal -1 hari.
      * Dengan format 'date:Y-m-d', output JSON selalu "2007-09-15" tanpa timezone noise.
@@ -59,5 +59,14 @@ class Person extends Model
     public function approvals()
     {
         return $this->morphMany(Approval::class, 'approvable');
+    }
+
+    /**
+     * Akun user yang terhubung ke person ini.
+     * Digunakan untuk whereDoesntHave('user') di admin user management.
+     */
+    public function user(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Models\User::class, 'person_id');
     }
 }
