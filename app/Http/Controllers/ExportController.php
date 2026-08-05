@@ -7,10 +7,30 @@ use App\Models\Person;
 use App\Models\Relationship;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Inertia\Inertia;
 
-class ExportController extends Controller
+class ExportController extends Controller implements HasMiddleware
 {
+    /**
+     * Fix data leak: sebelumnya endpoint export tidak dijaga otorisasi
+     * apa pun (padahal permission 'export_data' sudah ada di seeder tapi
+     * tidak pernah dipakai). Semua user login bisa export seluruh data
+     * anggota (termasuk draft/pending), relasi, dan statistik user.
+     *
+     * Sekarang hanya user yang punya permission 'export_data' (default:
+     * role admin saja, lihat RolePermissionSeeder) yang bisa akses.
+     */
+    public static function middleware(): array
+    {
+        return [
+            // exportPersonPDF dikecualikan: itu memang untuk semua user login
+            // (lihat komentar di routes/web.php), bukan cuma admin.
+            new Middleware('can:export_data', except: ['exportPersonPDF']),
+        ];
+    }
+
     public function index()
     {
         $stats = [
