@@ -294,59 +294,175 @@ class ExportController extends Controller
      * Bangun file XLSX sederhana menggunakan SpreadsheetML + ZipArchive.
      * Tidak perlu library eksternal — hanya PHP built-in.
      */
-    private function buildXlsx(array $rows): string
+    /**
+     * Bangun XLSX dengan styling lengkap (pure PHP, tanpa Composer package):
+     * - Header: bold, background indigo-light, border
+     * - Data: border tipis semua sel
+     * - Freeze row pertama (header tetap terlihat saat scroll)
+     * - Auto-width kolom (maks 60 karakter)
+     * - Landscape, fit-to-width untuk print
+     */
+    private function buildXlsx(array $rows, string $sheetName = 'Anggota'): string
     {
-        // Escape XML entities
         $esc = fn (string $v): string => htmlspecialchars($v, ENT_XML1 | ENT_COMPAT, 'UTF-8');
 
-        // Bangun sheet XML
-        $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            .'<sheetData>';
-
-        foreach ($rows as $rowIdx => $row) {
-            $sheetXml .= '<row r="'.($rowIdx + 1).'">';
-            foreach ($row as $colIdx => $cell) {
-                $colLetter = $this->colLetter($colIdx);
-                $cellRef = $colLetter.($rowIdx + 1);
-                $sheetXml .= '<c r="'.$cellRef.'" t="inlineStr">'
-                    .'<is><t>'.$esc((string) $cell).'</t></is></c>';
+        // ── 1. Hitung lebar kolom optimal ────────────────────────────────────
+        $colWidths = [];
+        foreach ($rows as $row) {
+            foreach ($row as $ci => $cell) {
+                $len = mb_strlen((string) $cell);
+                $colWidths[$ci] = max($colWidths[$ci] ?? 8, $len);
             }
-            $sheetXml .= '</row>';
         }
 
-        $sheetXml .= '</sheetData></worksheet>';
+        // ── 2. styles.xml ─────────────────────────────────────────────────────
+        // Style index yang akan dipakai di sel:
+        //   s="0" → normal (default, wajib ada)
+        //   s="1" → header: bold, background indigo-50, border, align left
+        //   s="2" → data:   normal font, border tipis, align center-vertical
+        $stylesXml =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
 
-        // File-file wajib dalam paket XLSX (zip)
+            // fonts: 0=normal, 1=bold
+            .'<fonts count="2">'
+            .'<font><sz val="10"/><name val="Calibri"/><family val="2"/></font>'
+            .'<font><b/><sz val="10"/><name val="Calibri"/><family val="2"/></font>'
+            .'</fonts>'
+
+            // fills: 0=none (required), 1=gray125 (required), 2=indigo-50 header bg
+            .'<fills count="3">'
+            .'<fill><patternFill patternType="none"/></fill>'
+            .'<fill><patternFill patternType="gray125"/></fill>'
+            .'<fill><patternFill patternType="solid"><fgColor rgb="FFE0E7FF"/><bgColor indexed="64"/></patternFill></fill>'
+            .'</fills>'
+
+            // borders: 0=none (required), 1=thin all sides #CCCCCC
+            .'<borders count="2">'
+            .'<border><left/><right/><top/><bottom/><diagonal/></border>'
+            .'<border>'
+            .'<left style="thin"><color rgb="FFCCCCCC"/></left>'
+            .'<right style="thin"><color rgb="FFCCCCCC"/></right>'
+            .'<top style="thin"><color rgb="FFCCCCCC"/></top>'
+            .'<bottom style="thin"><color rgb="FFCCCCCC"/></bottom>'
+            .'<diagonal/>'
+            .'</border>'
+            .'</borders>'
+
+            // cellStyleXfs (base, required)
+            .'<cellStyleXfs count="1">'
+            .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>'
+            .'</cellStyleXfs>'
+
+            // cellXfs: xf[0]=default, xf[1]=header, xf[2]=data
+            .'<cellXfs count="3">'
+            // xf 0: default
+            .'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+            // xf 1: header — bold + indigo bg + border + left-align
+            .'<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0"'
+            .' applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">'
+            .'<alignment horizontal="left" vertical="center" wrapText="0"/>'
+            .'</xf>'
+            // xf 2: data — border + vertical center
+            .'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0"'
+            .' applyBorder="1" applyAlignment="1">'
+            .'<alignment vertical="center" wrapText="0"/>'
+            .'</xf>'
+            .'</cellXfs>'
+
+            .'<cellStyles count="1">'
+            .'<cellStyle name="Normal" xfId="0" builtinId="0"/>'
+            .'</cellStyles>'
+            .'</styleSheet>';
+
+        // ── 3. cols XML (auto-width) ──────────────────────────────────────────
+        $colsXml = '<cols>';
+        foreach ($colWidths as $ci => $charLen) {
+            $width = min(60, $charLen + 4); // padding 4 karakter, maks 60
+            $col = $ci + 1;
+            $colsXml .= '<col min="'.$col.'" max="'.$col.'" width="'.$width.'" customWidth="1"/>';
+        }
+        $colsXml .= '</cols>';
+
+        // ── 4. sheetData ──────────────────────────────────────────────────────
+        $sheetData = '';
+        foreach ($rows as $rowIdx => $row) {
+            $isHeader = ($rowIdx === 0);
+            $styleId = $isHeader ? '1' : '2';
+            $rowHeight = $isHeader
+                ? ' ht="18" customHeight="1"'
+                : ' ht="15" customHeight="1"';
+
+            $sheetData .= '<row r="'.($rowIdx + 1).'"'.$rowHeight.'>';
+            foreach ($row as $colIdx => $cell) {
+                $ref = $this->colLetter($colIdx).($rowIdx + 1);
+                $sheetData .= '<c r="'.$ref.'" t="inlineStr" s="'.$styleId.'">'
+                    .'<is><t>'.$esc((string) $cell).'</t></is></c>';
+            }
+            $sheetData .= '</row>';
+        }
+
+        // ── 5. sheet1.xml ─────────────────────────────────────────────────────
+        $sheetXml =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            .'<sheetViews>'
+            .'<sheetView workbookViewId="0">'
+            // freeze baris pertama: scroll area mulai dari A2
+            .'<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
+            .'<selection pane="bottomLeft" activeCell="A2" sqref="A2"/>'
+            .'</sheetView>'
+            .'</sheetViews>'
+            .'<sheetFormatPr defaultRowHeight="15"/>'
+            .$colsXml
+            .'<sheetData>'.$sheetData.'</sheetData>'
+            // landscape, fit semua kolom dalam 1 halaman
+            .'<pageSetup orientation="landscape" fitToPage="1" fitToWidth="1" fitToHeight="0" paperSize="9"/>'
+            .'</worksheet>';
+
+        // ── 6. Zip assembly ───────────────────────────────────────────────────
         $files = [
             '_rels/.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                 .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+                .'<Relationship Id="rId1"'
+                .' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"'
+                .' Target="xl/workbook.xml"/>'
                 .'</Relationships>',
 
             '[Content_Types].xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                 .'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
                 .'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
                 .'<Default Extension="xml" ContentType="application/xml"/>'
-                .'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-                .'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                .'<Override PartName="/xl/workbook.xml"'
+                .' ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+                .'<Override PartName="/xl/worksheets/sheet1.xml"'
+                .' ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                .'<Override PartName="/xl/styles.xml"'
+                .' ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
                 .'</Types>',
 
             'xl/workbook.xml' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-                .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-                .'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
-                .'<sheets><sheet name="Anggota" sheetId="1" r:id="rId1"/></sheets>'
+                .'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+                .' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+                .'<sheets>'
+                .'<sheet name="'.$esc($sheetName).'" sheetId="1" r:id="rId1"/>'
+                .'</sheets>'
                 .'</workbook>',
 
             'xl/_rels/workbook.xml.rels' => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                 .'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                .'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+                .'<Relationship Id="rId1"'
+                .' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"'
+                .' Target="worksheets/sheet1.xml"/>'
+                .'<Relationship Id="rId2"'
+                .' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"'
+                .' Target="styles.xml"/>'
                 .'</Relationships>',
 
+            'xl/styles.xml' => $stylesXml,
             'xl/worksheets/sheet1.xml' => $sheetXml,
         ];
 
-        // Buat zip di memory
         $tmpFile = tempnam(sys_get_temp_dir(), 'xlsx_');
         $zip = new \ZipArchive;
         $zip->open($tmpFile, \ZipArchive::OVERWRITE);
@@ -362,7 +478,7 @@ class ExportController extends Controller
     }
 
     /**
-     * Konversi index kolom (0-based) ke huruf Excel: 0 → A, 25 → Z, 26 → AA
+     * Konversi index kolom (0-based) ke huruf Excel: 0→A, 25→Z, 26→AA
      */
     private function colLetter(int $index): string
     {
