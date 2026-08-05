@@ -12,6 +12,20 @@ use Spatie\Permission\Models\Role;
 
 class UserManagementController extends Controller
 {
+    /**
+     * Lapis kedua otorisasi (defense-in-depth). Route sudah dijaga
+     * middleware role:admin, tapi controller ini tetap self-guard
+     * supaya aman meski suatu saat route grup-nya berubah/salah pasang.
+     */
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            abort_unless(auth()->user()?->isAdmin(), 403);
+
+            return $next($request);
+        });
+    }
+
     /** daftar semua user */
     public function index(Request $request)
     {
