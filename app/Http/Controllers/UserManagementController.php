@@ -5,25 +5,30 @@ namespace App\Http\Controllers;
 use App\Models\Person;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
 
-class UserManagementController extends Controller
+class UserManagementController extends Controller implements HasMiddleware
 {
     /**
      * Lapis kedua otorisasi (defense-in-depth). Route sudah dijaga
      * middleware role:admin, tapi controller ini tetap self-guard
      * supaya aman meski suatu saat route grup-nya berubah/salah pasang.
+     *
+     * Catatan Laravel 11: constructor-based $this->middleware() sudah
+     * TIDAK berlaku lagi (itu cara Laravel 10 ke bawah). Laravel 11
+     * mewajibkan controller implement HasMiddleware + method static
+     * middleware() seperti di bawah ini.
      */
-    public function __construct()
+    public static function middleware(): array
     {
-        $this->middleware(function ($request, $next) {
-            abort_unless(auth()->user()?->isAdmin(), 403);
-
-            return $next($request);
-        });
+        return [
+            new Middleware('role:admin'),
+        ];
     }
 
     /** daftar semua user */
