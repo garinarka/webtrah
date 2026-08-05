@@ -65,6 +65,18 @@ Route::middleware(['auth', 'verified', 'role:admin|moderator'])->group(function 
     Route::delete('/approvals/{approval}/cancel', [ApprovalController::class, 'cancel'])->name('approvals.cancel');
 });
 
+// User management — HANYA admin. Privilege escalation fix: sebelumnya
+// grup ini menumpang di middleware auth,verified biasa tanpa cek role,
+// sehingga user non-admin bisa memanggil endpoint ganti-role/reset-password.
+Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
+    Route::get('/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
+    Route::patch('/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.update-role');
+    Route::post('/users/{user}/reset-password', [UserManagementController::class, 'sendPasswordReset'])->name('users.reset-password');
+    Route::get('/people-without-users', [UserManagementController::class, 'peopleWithoutUsers'])->name('users.people-without-users');
+    Route::post('/users/from-person', [UserManagementController::class, 'storeFromPerson'])->name('users.from-person');
+});
+
 // Family Unit CRUD — gunakan auth middleware; policy di controller enforce siapa yang boleh
 Route::middleware(['auth', 'verified'])->group(function () {
     // PENTING: /family/create harus SEBELUM /family/{familyUnit}
@@ -77,17 +89,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/family/{familyUnit}', [FamilyUnitController::class, 'destroy'])->name('family-units.destroy');
     // inline create dari wizard
     Route::post('/api/family-units/inline', [FamilyUnitController::class, 'storeInline'])->name('family-units.inline');
-
-    // User management
-    Route::prefix('admin')->name('admin.')->group(function () {
-        Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
-        Route::get('/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
-        Route::patch('/users/{user}/role', [UserManagementController::class, 'updateRole'])->name('users.update-role');
-        Route::post('/users/{user}/reset-password', [UserManagementController::class, 'sendPasswordReset'])->name('users.reset-password');
-        // Tambah user dari tabel people
-        Route::get('/people-without-users', [UserManagementController::class, 'peopleWithoutUsers'])->name('users.people-without-users');
-        Route::post('/users/from-person', [UserManagementController::class, 'storeFromPerson'])->name('users.from-person');
-    });
 
     // Export
     Route::prefix('export')->name('export.')->group(function () {
