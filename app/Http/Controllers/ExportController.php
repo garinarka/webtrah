@@ -484,17 +484,26 @@ class ExportController extends Controller implements HasMiddleware
         ];
 
         $tmpFile = tempnam(sys_get_temp_dir(), 'xlsx_');
-        $zip = new \ZipArchive;
-        $zip->open($tmpFile, \ZipArchive::OVERWRITE);
-        foreach ($files as $name => $xmlContent) {
-            $zip->addFromString($name, $xmlContent);
+
+        try {
+            $zip = new \ZipArchive;
+
+            if ($zip->open($tmpFile, \ZipArchive::OVERWRITE) !== true) {
+                throw new \RuntimeException('Gagal membuka file zip sementara untuk export XLSX.');
+            }
+
+            foreach ($files as $name => $xmlContent) {
+                $zip->addFromString($name, $xmlContent);
+            }
+            $zip->close();
+
+            return file_get_contents($tmpFile);
+        } finally {
+            // finally memastikan file sementara SELALU terhapus, baik proses di atas sukses, return lebih awal, atau exception
+            if (file_exists($tmpFile)) {
+                unlink($tmpFile);
+            }
         }
-        $zip->close();
-
-        $content = file_get_contents($tmpFile);
-        unlink($tmpFile);
-
-        return $content;
     }
 
     /**
