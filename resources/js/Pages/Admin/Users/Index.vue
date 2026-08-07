@@ -516,11 +516,7 @@ const submit = () => {
                                 </span>
                                 <button
                                     type="button"
-                                    @click="
-                                        selectedPerson = null
-                                        form.person_id = ''
-                                        personSearch = ''
-                                    "
+                                    @click="selectedPerson = null; form.person_id = ''; personSearch = ''"
                                     class="ml-auto flex-shrink-0 text-indigo-400 hover:text-indigo-600"
                                 >
                                     <svg
