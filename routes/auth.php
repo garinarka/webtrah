@@ -15,7 +15,9 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
+    // throttle: cegah pembuatan akun massal/otomatis (spam registrasi)
+    Route::post('register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:6,1');
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
@@ -25,13 +27,18 @@ Route::middleware('guest')->group(function () {
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
+    // throttle: cegah email bombing — endpoint ini sebelumnya bisa
+    // dipanggil tanpa batas untuk spam kirim email reset ke user manapun
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:6,1')
         ->name('password.email');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
 
+    // throttle: cegah brute-force tebak token reset password
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:6,1')
         ->name('password.store');
 });
 
