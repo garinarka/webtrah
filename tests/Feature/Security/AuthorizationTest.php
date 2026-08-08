@@ -80,30 +80,32 @@ class AuthorizationTest extends TestCase
 
     public function test_regular_user_cannot_access_export_page(): void
     {
+        // ExportController pakai middleware can:export_data (Gate),
+        // beda dari role:admin yang redirect — Gate middleware selalu 403.
         $this->actingAs($this->makeUser())
             ->get('/export')
-            ->assertRedirect();
+            ->assertForbidden();
     }
 
     public function test_moderator_cannot_access_export_page(): void
     {
         $this->actingAs($this->makeModerator())
             ->get('/export')
-            ->assertRedirect();
+            ->assertForbidden();
     }
 
     public function test_regular_user_cannot_download_people_csv(): void
     {
         $this->actingAs($this->makeUser())
             ->get('/export/people/csv')
-            ->assertRedirect();
+            ->assertForbidden();
     }
 
     public function test_moderator_cannot_download_people_csv(): void
     {
         $this->actingAs($this->makeModerator())
             ->get('/export/people/csv')
-            ->assertRedirect();
+            ->assertForbidden();
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -112,16 +114,16 @@ class AuthorizationTest extends TestCase
 
     public function test_regular_user_cannot_approve_approval(): void
     {
-        $user   = $this->makeUser();
+        $user = $this->makeUser();
         $family = $this->makeFamily();
         $person = Person::factory()->pending()->create([
             'family_unit_id' => $family->id,
-            'created_by'     => $user->id,
+            'created_by' => $user->id,
         ]);
         $approval = Approval::factory()->pending()->create([
             'approvable_type' => Person::class,
-            'approvable_id'   => $person->id,
-            'requested_by'    => $user->id,
+            'approvable_id' => $person->id,
+            'requested_by' => $user->id,
         ]);
 
         $this->actingAs($user)
@@ -133,16 +135,16 @@ class AuthorizationTest extends TestCase
 
     public function test_regular_user_cannot_reject_approval(): void
     {
-        $user   = $this->makeUser();
+        $user = $this->makeUser();
         $family = $this->makeFamily();
         $person = Person::factory()->pending()->create([
             'family_unit_id' => $family->id,
-            'created_by'     => $user->id,
+            'created_by' => $user->id,
         ]);
         $approval = Approval::factory()->pending()->create([
             'approvable_type' => Person::class,
-            'approvable_id'   => $person->id,
-            'requested_by'    => $user->id,
+            'approvable_id' => $person->id,
+            'requested_by' => $user->id,
         ]);
 
         $this->actingAs($user)
@@ -154,7 +156,7 @@ class AuthorizationTest extends TestCase
 
     public function test_regular_user_cannot_change_any_user_role(): void
     {
-        $user   = $this->makeUser();
+        $user = $this->makeUser();
         $target = $this->makeModerator();
 
         $this->actingAs($user)
@@ -166,12 +168,12 @@ class AuthorizationTest extends TestCase
 
     public function test_regular_user_cannot_delete_person_created_by_others(): void
     {
-        $user    = $this->makeUser();
-        $family  = $this->makeFamily();
+        $user = $this->makeUser();
+        $family = $this->makeFamily();
         $creator = $this->makeUser();
-        $person  = Person::factory()->active()->create([
+        $person = Person::factory()->active()->create([
             'family_unit_id' => $family->id,
-            'created_by'     => $creator->id,
+            'created_by' => $creator->id,
         ]);
 
         $this->actingAs($user)
@@ -182,17 +184,17 @@ class AuthorizationTest extends TestCase
     public function test_moderator_cannot_approve_relationship_directly(): void
     {
         $moderator = $this->makeModerator();
-        $family    = $this->makeFamily();
-        $p1        = Person::factory()->active()->create(['family_unit_id' => $family->id]);
-        $p2        = Person::factory()->active()->create(['family_unit_id' => $family->id]);
+        $family = $this->makeFamily();
+        $p1 = Person::factory()->active()->create(['family_unit_id' => $family->id]);
+        $p2 = Person::factory()->active()->create(['family_unit_id' => $family->id]);
 
         $relation = Relationship::create([
-            'subject_id'    => $p1->id,
-            'object_id'     => $p2->id,
-            'type'          => 'parent',
-            'status'        => 'pending',
+            'subject_id' => $p1->id,
+            'object_id' => $p2->id,
+            'type' => 'parent',
+            'status' => 'pending',
             'is_biological' => true,
-            'created_by'    => $moderator->id,
+            'created_by' => $moderator->id,
         ]);
 
         $this->actingAs($moderator)
@@ -207,17 +209,17 @@ class AuthorizationTest extends TestCase
     public function test_moderator_cannot_inject_status_active_when_creating_person(): void
     {
         $moderator = $this->makeModerator();
-        $family    = $this->makeFamily();
+        $family = $this->makeFamily();
 
         $this->actingAs($moderator)->post('/people', [
-            'display_name'   => 'Injeksi Test',
-            'gender'         => 'male',
-            'birth_date'     => '1990-01-01',
+            'display_name' => 'Injeksi Test',
+            'gender' => 'male',
+            'birth_date' => '1990-01-01',
             'birth_accuracy' => 'exact',
-            'death_date'     => null,
+            'death_date' => null,
             'death_accuracy' => 'unknown',
             'family_unit_id' => $family->id,
-            'status'         => 'active',
+            'status' => 'active',
         ]);
 
         $this->assertDatabaseHas('people', ['display_name' => 'Injeksi Test', 'status' => 'pending']);
@@ -230,29 +232,38 @@ class AuthorizationTest extends TestCase
         $this->withoutExceptionHandling();
 
         $moderator = $this->makeModerator();
-        $family    = $this->makeFamily();
+        $family = $this->makeFamily();
+
+        // Moderator harus terdaftar sebagai pengelola family unit ini
+        // supaya PersonPolicy::update() mengizinkan (lihat User::managesUnit()).
+        \Illuminate\Support\Facades\DB::table('moderator_family_units')->insert([
+            'user_id' => $moderator->id,
+            'family_unit_id' => $family->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $person = Person::factory()->active()->create([
             'family_unit_id' => $family->id,
-            'created_by'     => $moderator->id,
-            'display_name'   => 'Nama Original',
-            'gender'         => 'male',
-            'birth_date'     => '1985-06-15',
+            'created_by' => $moderator->id,
+            'display_name' => 'Nama Original',
+            'gender' => 'male',
+            'birth_date' => '1985-06-15',
             'birth_accuracy' => 'exact',
-            'death_date'     => null,
+            'death_date' => null,
             'death_accuracy' => 'unknown',
         ]);
 
         // Kirim update dengan display_name BERBEDA - pasti ada perubahan
         $response = $this->actingAs($moderator)->patch("/people/{$person->id}", [
-            'display_name'   => 'Nama Setelah Edit',  // berbeda dari 'Nama Original'
-            'gender'         => 'male',
-            'birth_date'     => '1985-06-15',         // SAMA - tidak berubah
+            'display_name' => 'Nama Setelah Edit',  // berbeda dari 'Nama Original'
+            'gender' => 'male',
+            'birth_date' => '1985-06-15',         // SAMA - tidak berubah
             'birth_accuracy' => 'exact',
-            'death_date'     => null,
+            'death_date' => null,
             'death_accuracy' => 'unknown',
             'family_unit_id' => $family->id,
-            'edit_reason'    => 'Koreksi nama yang salah tulis',
+            'edit_reason' => 'Koreksi nama yang salah tulis',
         ]);
 
         // Response harus redirect (bukan 422 validation error atau 403)
@@ -260,17 +271,17 @@ class AuthorizationTest extends TestCase
 
         // Person asli tidak berubah langsung - approval workflow berlaku
         $this->assertDatabaseHas('people', [
-            'id'           => $person->id,
+            'id' => $person->id,
             'display_name' => 'Nama Original',
         ]);
 
         // Approval pending harus terbuat
         $this->assertDatabaseHas('approvals', [
             'approvable_type' => Person::class,
-            'approvable_id'   => $person->id,
-            'action'          => 'update',
-            'status'          => 'pending',
-            'requested_by'    => $moderator->id,
+            'approvable_id' => $person->id,
+            'action' => 'update',
+            'status' => 'pending',
+            'requested_by' => $moderator->id,
         ]);
     }
 
@@ -306,7 +317,7 @@ class AuthorizationTest extends TestCase
 
     public function test_admin_can_access_all_export_endpoints(): void
     {
-        $admin  = $this->makeAdmin();
+        $admin = $this->makeAdmin();
         $family = $this->makeFamily();
         Person::factory()->active()->count(3)->create(['family_unit_id' => $family->id]);
 
@@ -325,7 +336,7 @@ class AuthorizationTest extends TestCase
 
     public function test_person_pdf_accessible_to_any_logged_in_user(): void
     {
-        $user   = $this->makeUser();
+        $user = $this->makeUser();
         $family = $this->makeFamily();
         $person = Person::factory()->active()->create(['family_unit_id' => $family->id]);
 
