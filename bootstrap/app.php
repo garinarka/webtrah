@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Sentry\Laravel\Integration;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,5 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Kirim semua exception yang tidak tertangani ke Sentry.
+        // Integration::handles() otomatis skip exception yang memang
+        // "normal" (404, validation error, dsb) — cuma error beneran
+        // yang dikirim, biar dashboard tidak berisik.
+        Integration::handles($exceptions);
     })->create();
