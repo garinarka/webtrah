@@ -15,14 +15,26 @@ class User extends Authenticatable
 
     protected $fillable = ['name', 'email', 'password', 'person_id'];
 
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            // Enkripsi otomatis di kolom database — walau database bocor,
+            // secret TOTP & recovery codes tidak langsung bisa dipakai.
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    // ── 2FA HELPERS ─────────────────────────────────────────────────────────
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        return ! is_null($this->two_factor_confirmed_at);
     }
 
     // ── ROLE HELPERS ───────────────────────────────────────────────────────

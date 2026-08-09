@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
@@ -40,6 +41,19 @@ Route::middleware('guest')->group(function () {
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->middleware('throttle:6,1')
         ->name('password.store');
+
+    // Challenge 2FA — di grup 'guest' karena user belum login penuh
+    // (lihat AuthenticatedSessionController::store, Auth::logout()
+    // dipanggil ulang sampai kode 2FA benar).
+    Route::get('two-factor-challenge', [TwoFactorController::class, 'challenge'])
+        ->name('two-factor.challenge');
+
+    // throttle ketat: kode cuma 6 digit, WAJIB dibatasi biar tidak
+    // bisa di-brute-force (1 juta kemungkinan, throttle bikin itu
+    // butuh waktu bertahun-tahun buat dicoba semua).
+    Route::post('two-factor-challenge', [TwoFactorController::class, 'verify'])
+        ->middleware('throttle:5,1')
+        ->name('two-factor.verify');
 });
 
 Route::middleware('auth')->group(function () {
@@ -63,4 +77,13 @@ Route::middleware('auth')->group(function () {
 
     Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
         ->name('logout');
+
+    // Setup 2FA — user yang login sendiri, siapa saja boleh (bukan
+    // cuma admin, walau admin yang kita WAJIBKAN nanti di Fase G lanjutan)
+    Route::get('two-factor/setup', [TwoFactorController::class, 'setup'])
+        ->name('two-factor.setup');
+    Route::post('two-factor/confirm', [TwoFactorController::class, 'confirm'])
+        ->name('two-factor.confirm');
+    Route::delete('two-factor', [TwoFactorController::class, 'disable'])
+        ->name('two-factor.disable');
 });
