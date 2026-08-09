@@ -16,9 +16,16 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
             \App\Http\Middleware\SecurityHeaders::class,
+            // Global, bukan per-route: admin punya hak istimewa di
+            // BANYAK tempat (lihat isAdmin() bypass di PersonPolicy,
+            // FamilyUnitPolicy, dll), bukan cuma /admin/users. Middleware
+            // ini sendiri no-op untuk guest & non-admin, jadi aman
+            // dipasang global tanpa dampak ke user/moderator biasa.
+            \App\Http\Middleware\EnsureAdminHasTwoFactorEnabled::class,
         ]);
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'require.2fa' => \App\Http\Middleware\EnsureAdminHasTwoFactorEnabled::class,
         ]);
 
         //
