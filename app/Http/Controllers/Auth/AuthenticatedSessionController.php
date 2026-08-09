@@ -31,6 +31,22 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
+        $user = Auth::user();
+
+        if ($user->hasTwoFactorEnabled()) {
+            // Password sudah benar, tapi belum boleh login penuh dulu.
+            // Logout lagi seketika (session Auth::attempt() tadi belum
+            // sempat di-regenerate jadi belum "menempel" ke browser),
+            // simpan user_id yang MENUNGGU verifikasi 2FA di session
+            // terpisah, redirect ke halaman challenge.
+            Auth::logout();
+
+            $request->session()->put('2fa_awaiting_user_id', $user->id);
+            $request->session()->put('2fa_remember', $request->boolean('remember'));
+
+            return redirect()->route('two-factor.challenge');
+        }
+
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard', absolute: false));
