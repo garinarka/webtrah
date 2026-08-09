@@ -48,6 +48,19 @@ const updatePassword = () => {
     })
 }
 
+// 2FA disable
+const showDisable2fa = ref(false)
+const disable2faForm = useForm({ password: '' })
+const disable2fa = () => {
+    disable2faForm.delete(route('two-factor.disable'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showDisable2fa.value = false
+            disable2faForm.reset()
+        },
+    })
+}
+
 // Hapus akun
 const deleteForm = useForm({ password: '' })
 const showDeleteConfirm = ref(false)
@@ -228,6 +241,88 @@ const deleteAccount = () => {
                         Simpan Password
                     </button>
                 </form>
+            </section>
+
+            <!-- Verifikasi 2 Langkah (2FA) -->
+            <section class="rounded-lg bg-white p-6 shadow">
+                <h2 class="text-lg font-medium text-gray-900">
+                    Verifikasi 2 Langkah (2FA)
+                </h2>
+                <p class="mt-1 text-sm text-gray-600">
+                    Lapisan keamanan tambahan pakai aplikasi authenticator di HP
+                    kamu.
+                </p>
+
+                <div v-if="user.two_factor_confirmed_at" class="mt-4">
+                    <span
+                        class="inline-flex items-center gap-1.5 text-sm font-medium text-green-700"
+                    >
+                        <span class="h-2 w-2 rounded-full bg-green-500"></span>
+                        Aktif
+                    </span>
+
+                    <form v-if="!showDisable2fa" class="mt-3">
+                        <button
+                            type="button"
+                            @click="showDisable2fa = true"
+                            class="rounded-md bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
+                        >
+                            Nonaktifkan 2FA
+                        </button>
+                    </form>
+                    <form
+                        v-else
+                        @submit.prevent="disable2fa"
+                        class="mt-3 space-y-3"
+                    >
+                        <label class="block text-sm font-medium text-gray-700">
+                            Masukkan password untuk konfirmasi
+                        </label>
+                        <input
+                            v-model="disable2faForm.password"
+                            type="password"
+                            class="block w-full rounded-md border-gray-300 shadow-sm"
+                            required
+                        />
+                        <p
+                            v-if="disable2faForm.errors.password"
+                            class="text-sm text-red-600"
+                        >
+                            {{ disable2faForm.errors.password }}
+                        </p>
+                        <div class="flex gap-3">
+                            <button
+                                type="submit"
+                                class="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700"
+                                :disabled="disable2faForm.processing"
+                            >
+                                Ya, Nonaktifkan
+                            </button>
+                            <button
+                                type="button"
+                                @click="showDisable2fa = false"
+                                class="rounded-md bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
+                            >
+                                Batal
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div v-else class="mt-4">
+                    <span
+                        v-if="user.role === 'admin'"
+                        class="mb-3 block text-sm font-medium text-red-600"
+                    >
+                        Wajib untuk akun admin — belum aktif.
+                    </span>
+                    <Link
+                        :href="route('two-factor.setup')"
+                        class="inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+                    >
+                        Aktifkan 2FA
+                    </Link>
+                </div>
             </section>
 
             <!-- Hapus Akun -->
