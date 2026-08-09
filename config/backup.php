@@ -11,16 +11,17 @@ return [
                 'include' => [
                     // Cuma backup yang benar-benar tidak bisa digenerate ulang.
                     // storage/app: file upload/export user.
-                    // .env: WAJIB di-backup terpisah juga secara manual/aman,
-                    // TAPI kita exclude dari backup otomatis ini supaya
-                    // secret production tidak numpuk di banyak file zip.
                     base_path('storage/app'),
                 ],
                 'exclude' => [
                     base_path('vendor'),
                     base_path('node_modules'),
-                    storage_path(), // hindari backup nested (log, cache, dll)
-                    base_path('storage/app/public'), // simlink, sudah di-include lewat storage/app kalau perlu
+                    // Spesifik, BUKAN storage_path() keseluruhan — kalau
+                    // exclude seluruh folder storage/, folder storage/app
+                    // yang mau di-include di atas ikut ke-exclude juga.
+                    storage_path('framework'),
+                    storage_path('logs'),
+                    storage_path('backup-temp'), // folder kerja sementara backup sendiri, lihat temporary_directory di bawah
                 ],
                 'follow_links' => false,
                 'ignore_unreadable_directories' => false,
@@ -50,7 +51,10 @@ return [
             'filename_prefix' => '',
         ],
 
-        'temporary_directory' => storage_path('app/backup-temp'),
+        // WAJIB di luar storage/app — itu folder yang sedang kita backup.
+        // Kalau ditaruh di dalamnya, file kerja sementara backup bisa
+        // ikut ke-scan sebagai bagian dari backup itu sendiri.
+        'temporary_directory' => storage_path('backup-temp'),
 
         'password' => env('BACKUP_ARCHIVE_PASSWORD'),
         'encryption' => 'default',
@@ -61,8 +65,13 @@ return [
             \Spatie\Backup\Notifications\Notifications\BackupHasFailedNotification::class => ['mail'],
             \Spatie\Backup\Notifications\Notifications\UnhealthyBackupWasFoundNotification::class => ['mail'],
             \Spatie\Backup\Notifications\Notifications\CleanupHasFailedNotification::class => ['mail'],
-            // Sengaja TIDAK notify tiap backup sukses — biar tidak
-            // spam email tiap hari. Cuma dikabari kalau ADA MASALAH.
+            // Event "sukses"/"sehat" TETAP harus terdaftar di sini (kalau
+            // tidak, package error "no notification class that can
+            // handle event ..."), tapi channel-nya kosong ([]) supaya
+            // tidak spam email tiap hari cuma karena backup jalan normal.
+            \Spatie\Backup\Notifications\Notifications\BackupWasSuccessfulNotification::class => [],
+            \Spatie\Backup\Notifications\Notifications\HealthyBackupWasFoundNotification::class => [],
+            \Spatie\Backup\Notifications\Notifications\CleanupWasSuccessfulNotification::class => [],
         ],
 
         'notifiable' => \Spatie\Backup\Notifications\Notifiable::class,
