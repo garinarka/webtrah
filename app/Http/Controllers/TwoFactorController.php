@@ -68,8 +68,34 @@ class TwoFactorController extends Controller
 
         $request->session()->forget('2fa_pending_secret');
 
+        // PENTING (aturan Inertia): respons untuk request POST WAJIB
+        // redirect ke route GET, tidak boleh Inertia::render() langsung
+        // dari sini — kalau tidak, Inertia "nempel" di URL POST ini dan
+        // reload/refresh berikutnya bakal GET ke sini, padahal route
+        // ini cuma terima POST -> error 405 Method Not Allowed.
+        // Kode recovery dititip lewat session flash, dibaca sekali di
+        // halaman GET tujuan lalu otomatis hilang.
+        $request->session()->flash('2fa_recovery_codes', $recoveryCodes);
+
+        return redirect()->route('two-factor.recovery-codes');
+    }
+
+    /**
+     * Halaman GET terpisah buat nampilin recovery codes sekali—dituju
+     * dari redirect confirm() di atas.
+     */
+    public function recoveryCodes(Request $request)
+    {
+        $codes = $request->session()->get('2fa_recovery_codes');
+
+        if (! $codes) {
+            // Diakses langsung tanpa lewat flow confirm() -> tidak ada
+            // apa-apa buat ditampilkan, balik ke profile saja.
+            return redirect()->route('profile.edit');
+        }
+
         return Inertia::render('TwoFactor/RecoveryCodes', [
-            'recoveryCodes' => $recoveryCodes,
+            'recoveryCodes' => $codes,
         ]);
     }
 
