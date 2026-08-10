@@ -29,6 +29,9 @@ class HandleInertiaRequests extends Middleware
                     // getAllPermissions() mencakup permission via role + langsung
                     // getPermissionNames() hanya return yang di-assign langsung → bug untuk admin/moderator/user
                     'permissions' => $user->getAllPermissions()->pluck('name'),
+                    // Status 2FA — dikirim sebagai boolean, BUKAN timestamp
+                    // mentah, supaya frontend tidak perlu tau format/timezone.
+                    'two_factor_enabled' => $user->hasTwoFactorEnabled(),
                     // IDs unit keluarga yang dikelola moderator (array, max 3)
                     // Admin: null (semua unit), User: null (tidak ada)
                     // Query langsung ke pivot table untuk menghindari ambiguitas kolom 'id'

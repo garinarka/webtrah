@@ -253,7 +253,7 @@ const deleteAccount = () => {
                     kamu.
                 </p>
 
-                <div v-if="user.two_factor_confirmed_at" class="mt-4">
+                <div v-if="user.two_factor_enabled" class="mt-4">
                     <span
                         class="inline-flex items-center gap-1.5 text-sm font-medium text-green-700"
                     >
