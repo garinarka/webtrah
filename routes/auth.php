@@ -84,6 +84,8 @@ Route::middleware('auth')->group(function () {
         ->name('two-factor.setup');
     Route::post('two-factor/confirm', [TwoFactorController::class, 'confirm'])
         ->name('two-factor.confirm');
+    Route::get('two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes'])
+        ->name('two-factor.recovery-codes');
     Route::delete('two-factor', [TwoFactorController::class, 'disable'])
         ->name('two-factor.disable');
 });
