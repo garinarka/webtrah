@@ -7,7 +7,7 @@
 ![Inertia](https://img.shields.io/badge/Inertia.js-2-9553E9?style=flat)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=flat)
-![CI](https://github.com/garinarka/webtrah/actions/workflows/ci.yml/badge.svg?branch=master)
+![CI](https://github.com/garinarka/webtrah/actions/workflows/ci.yml/badge.svg?branch=development)
 
 ---
 
