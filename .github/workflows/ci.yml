@@ -12,14 +12,27 @@ jobs:
   backend-tests:
     runs-on: ubuntu-latest
 
+    # Kredensial DB di-set DI SINI, jadi single source of truth untuk CI.
+    # Nilai ini otomatis meng-override apapun isi .env.testing (env var
+    # asli sistem operasi selalu menang atas isi file .env saat Laravel
+    # load Dotenv), jadi CI tidak pernah rusak lagi gara-gara .env.testing
+    # lokal berubah.
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: family_tree_db_test
+      DB_USERNAME: ci_test_user
+      DB_PASSWORD: ci_test_password
+
     # Postgres sementara, khusus buat run ini — dibuat & dihapus otomatis,
     # SAMA SEKALI TIDAK menyentuh database lokal/production.
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: family_user_test
-          POSTGRES_PASSWORD: change_me_in_local_only
+          POSTGRES_USER: ci_test_user
+          POSTGRES_PASSWORD: ci_test_password
           POSTGRES_DB: family_tree_db_test
         ports:
           - 5432:5432
