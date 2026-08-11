@@ -33,10 +33,10 @@ jobs:
       - name: Checkout kode
         uses: actions/checkout@v4
 
-      - name: Setup PHP 8.2
+      - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
           extensions: pgsql, pdo_pgsql, mbstring, bcmath, gd, zip, intl
           coverage: none
 
@@ -88,10 +88,10 @@ jobs:
       - name: Checkout kode
         uses: actions/checkout@v4
 
-      - name: Setup PHP 8.2
+      - name: Setup PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
           coverage: none
 
       - name: Install dependencies (composer)
