@@ -36,6 +36,9 @@ class TwoFactorController extends Controller
         return Inertia::render('TwoFactor/Setup', [
             'secret' => $secret,
             'qrCodeUrl' => $qrCodeUrl,
+            // Tangkap pesan dari redirect middleware (mis. "wajib 2FA untuk
+            // admin") — pola sama seperti halaman auth Breeze lainnya.
+            'status' => session('status'),
         ]);
     }
 
