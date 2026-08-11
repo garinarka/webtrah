@@ -7,6 +7,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 const props = defineProps({
     secret: { type: String, required: true },
     qrCodeUrl: { type: String, required: true },
+    status: { type: String, default: null },
 })
 
 const qrCanvas = ref(null)
@@ -27,6 +28,13 @@ const submit = () => {
     <AppLayout>
         <div class="mx-auto max-w-md p-4">
             <div class="rounded-lg bg-white p-6 shadow">
+                <div
+                    v-if="status"
+                    class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                >
+                    {{ status }}
+                </div>
+
                 <h1 class="text-xl font-bold text-gray-900">
                     Aktifkan Verifikasi 2 Langkah
                 </h1>
