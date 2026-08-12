@@ -43,29 +43,11 @@ class ApprovalController extends Controller
             ->where('status', 'pending')
             ->orderBy('created_at', 'desc');
 
-        // Moderator melihat approvals:
-        //   1. Approval untuk person di unit-unit yang mereka kelola
-        //   2. ATAU approval yang mereka sendiri ajukan (requested_by = user id)
-        //      — ini penting agar moderator bisa pantau status pengajuan mereka sendiri
+        // Moderator HANYA melihat approval yang mereka ajukan sendiri.
+        // Admin yang bisa lihat SEMUA pengajuan pending (tidak difilter
+        // di sini — lihat kondisi if di bawah, cuma berlaku utk moderator).
         if ($user->isModerator()) {
-            $unitIds = \Illuminate\Support\Facades\DB::table('moderator_family_units')
-                ->where('user_id', $user->id)
-                ->pluck('family_unit_id')
-                ->toArray();
-
-            if (! empty($unitIds)) {
-                $query->where(function ($q) use ($unitIds, $user) {
-                    // Approval untuk person di unit yang dikelola moderator ini
-                    $q->whereHasMorph('approvable', [\App\Models\Person::class], function ($inner) use ($unitIds) {
-                        $inner->whereIn('family_unit_id', $unitIds);
-                    })
-                    // ATAU approval yang diajukan moderator ini sendiri
-                        ->orWhere('requested_by', $user->id);
-                });
-            } else {
-                // Moderator tanpa unit: hanya bisa lihat pengajuannya sendiri
-                $query->where('requested_by', $user->id);
-            }
+            $query->where('requested_by', $user->id);
         }
 
         $approvals = $query->paginate(15);
@@ -73,8 +55,10 @@ class ApprovalController extends Controller
         return Inertia::render('Approvals/Index', [
             'approvals' => $approvals,
             'can' => [
-                'approve' => $request->user()->can('approve_changes'),
-                'reject' => $request->user()->can('reject_changes'),
+                // Approve/reject cuma admin — moderator tidak pernah bisa,
+                // apapun approval-nya (lihat ApprovalPolicy::approve()).
+                'approve' => $user->isAdmin(),
+                'reject' => $user->isAdmin(),
             ],
         ]);
     }
@@ -94,9 +78,11 @@ class ApprovalController extends Controller
             'can' => [
                 'approve' => $user->can('approve', $approval),
                 'reject' => $user->can('reject', $approval),
-                // Pengaju (moderator/user) bisa cancel approvalnya sendiri jika masih pending
+                // Pengaju bisa cancel approvalnya sendiri jika masih pending.
+                // Admin SENGAJA tidak diberi akses cancel (beda dari
+                // approve/reject) — cuma pembuat pengajuan yang boleh.
                 'cancel' => $approval->status === 'pending'
-                    && ((int) $approval->requested_by === (int) $user->id || $user->isAdmin()),
+                    && (int) $approval->requested_by === (int) $user->id,
             ],
         ]);
     }
@@ -204,8 +190,10 @@ class ApprovalController extends Controller
             return back()->withErrors(['error' => 'Hanya approval yang masih pending yang bisa dibatalkan.']);
         }
 
-        // Hanya pengaju atau admin
-        if (! $user->isAdmin() && (int) $approval->requested_by !== (int) $user->id) {
+        // HANYA pengaju sendiri — admin TIDAK diberi akses cancel di sini,
+        // karena tindakan ini secara sengaja dibatasi cuma milik pembuat
+        // pengajuan (beda dari approve/reject yang memang hak admin).
+        if ((int) $approval->requested_by !== (int) $user->id) {
             abort(403, 'Tidak berwenang membatalkan pengajuan ini.');
         }
 

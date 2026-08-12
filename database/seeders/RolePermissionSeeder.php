@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -35,15 +35,14 @@ class RolePermissionSeeder extends Seeder
         $adminRole = Role::firstOrCreate(['name' => 'admin']);
         $adminRole->givePermissionTo(Permission::all());
 
-        // Moderator: operasional
+        // Moderator: operasional — BISA ajukan perubahan (create/edit),
+        // TIDAK BISA approve/reject. Approve/reject cuma hak admin.
         $moderatorRole = Role::firstOrCreate(['name' => 'moderator']);
         $moderatorRole->syncPermissions([
             'view_people',
             'create_person',
             'edit_person',
             'view_approvals',
-            'approve_changes',
-            'reject_changes',
             'view_family_unit',
         ]);
 

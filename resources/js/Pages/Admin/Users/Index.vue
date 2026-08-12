@@ -78,7 +78,15 @@ const searchPersons = async () => {
             params: { search: personSearch.value },
         })
         personResults.value = res.data
-    } catch {
+    } catch (error) {
+        // Jangan telan error diam-diam — user cuma lihat "tidak ada apa-apa"
+        // tanpa petunjuk apapun kalau request gagal. Log ke console biar
+        // kelihatan status code & pesan aslinya waktu debugging.
+        console.error(
+            'Gagal cari data anggota:',
+            error.response?.status,
+            error.response?.data ?? error.message,
+        )
         personResults.value = []
     } finally {
         personLoading.value = false
