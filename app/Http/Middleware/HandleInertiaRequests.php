@@ -25,6 +25,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'avatar_url' => $user->avatar_url,
                     'role' => $user->roles->first()?->name,
                     // getAllPermissions() mencakup permission via role + langsung
                     // getPermissionNames() hanya return yang di-assign langsung → bug untuk admin/moderator/user

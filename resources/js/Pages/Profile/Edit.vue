@@ -14,6 +14,40 @@ defineProps({
 
 const user = usePage().props.auth.user
 
+// Foto profil
+const avatarInput = ref(null)
+const avatarPreview = ref(null)
+const avatarForm = useForm({ avatar: null })
+
+const pickAvatar = () => avatarInput.value?.click()
+
+const onAvatarChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    avatarForm.avatar = file
+    avatarPreview.value = URL.createObjectURL(file)
+
+    // Langsung upload begitu file dipilih — tidak perlu tombol "simpan"
+    // terpisah, lebih simpel buat user.
+    avatarForm.post(route('profile.avatar.update'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            avatarPreview.value = null // pakai avatar_url baru dari server
+        },
+        onError: () => {
+            avatarPreview.value = null
+        },
+    })
+}
+
+const deleteAvatarForm = useForm({})
+const removeAvatar = () => {
+    deleteAvatarForm.delete(route('profile.avatar.delete'), {
+        preserveScroll: true,
+    })
+}
+
 // Form info profil
 const profileForm = useForm({
     name: user.name,
@@ -81,6 +115,70 @@ const deleteAccount = () => {
     <AppLayout>
         <div class="mx-auto max-w-2xl space-y-6 p-4">
             <h1 class="text-2xl font-bold text-gray-900">Profil Saya</h1>
+
+            <!-- Foto Profil -->
+            <section class="rounded-lg bg-white p-6 shadow">
+                <h2 class="text-lg font-medium text-gray-900">Foto Profil</h2>
+
+                <div class="mt-4 flex items-center gap-5">
+                    <div class="relative">
+                        <img
+                            v-if="avatarPreview || user.avatar_url"
+                            :src="avatarPreview || user.avatar_url"
+                            alt="Foto profil"
+                            class="h-20 w-20 rounded-full object-cover ring-2 ring-gray-100"
+                        />
+                        <div
+                            v-else
+                            class="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-100 text-2xl font-semibold text-indigo-700"
+                        >
+                            {{ user.name.charAt(0).toUpperCase() }}
+                        </div>
+
+                        <div
+                            v-if="avatarForm.processing"
+                            class="absolute inset-0 flex items-center justify-center rounded-full bg-black/40"
+                        >
+                            <span class="text-xs text-white">...</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <input
+                            ref="avatarInput"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            class="hidden"
+                            @change="onAvatarChange"
+                        />
+                        <button
+                            type="button"
+                            @click="pickAvatar"
+                            class="block rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+                            :disabled="avatarForm.processing"
+                        >
+                            {{ user.avatar_url ? 'Ganti Foto' : 'Unggah Foto' }}
+                        </button>
+                        <button
+                            v-if="user.avatar_url && !avatarForm.processing"
+                            type="button"
+                            @click="removeAvatar"
+                            class="block text-sm text-red-600 hover:text-red-700"
+                        >
+                            Hapus Foto
+                        </button>
+                        <p class="text-xs text-gray-500">
+                            JPG, PNG, atau WEBP. Maksimal 2MB.
+                        </p>
+                        <p
+                            v-if="avatarForm.errors.avatar"
+                            class="text-xs text-red-600"
+                        >
+                            {{ avatarForm.errors.avatar }}
+                        </p>
+                    </div>
+                </div>
+            </section>
 
             <!-- Info Profil -->
             <section class="rounded-lg bg-white p-6 shadow">

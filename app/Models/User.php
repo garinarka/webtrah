@@ -17,6 +17,21 @@ class User extends Authenticatable
 
     protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
 
+    protected $appends = ['avatar_url'];
+
+    /**
+     * URL publik foto profil, atau null kalau belum ada (frontend fallback
+     * ke lingkaran inisial huruf). avatar_path SENGAJA tidak masuk
+     * $fillable — diisi manual lewat ProfileController, bukan mass
+     * assignment, biar tidak bisa disuntik dari form lain.
+     */
+    public function getAvatarUrlAttribute(): ?string
+    {
+        return $this->avatar_path
+            ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar_path)
+            : null;
+    }
+
     protected function casts(): array
     {
         return [

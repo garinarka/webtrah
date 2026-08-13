@@ -344,7 +344,14 @@ const decidedColor = (notif) => {
                         <span class="hidden text-sm text-gray-600 md:block">{{
                             user.name
                         }}</span>
+                        <img
+                            v-if="user.avatar_url"
+                            :src="user.avatar_url"
+                            alt="Foto profil"
+                            class="h-8 w-8 rounded-full object-cover"
+                        />
                         <div
+                            v-else
                             class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700"
                         >
                             {{ user.name.charAt(0).toUpperCase() }}
