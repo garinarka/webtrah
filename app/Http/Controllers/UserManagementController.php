@@ -161,9 +161,15 @@ class UserManagementController extends Controller implements HasMiddleware
             return back()->withErrors(['reset' => 'Gunakan fitur lupa password untuk diri sendiri.']);
         }
 
-        \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
+        try {
+            \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
 
-        return back()->with('message', "Link reset password telah dikirim ke {$user->email}.");
+            return back()->with('message', "Link reset password telah dikirim ke {$user->email}.");
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->withErrors(['reset' => "Gagal mengirim email: {$e->getMessage()}"]);
+        }
     }
 
     /**
@@ -233,16 +239,31 @@ class UserManagementController extends Controller implements HasMiddleware
 
             $user->assignRole($data['role']);
 
-            // Kirim link reset password agar user bisa set password sendiri
-            \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
-
+            // Commit di sini — pembuatan akun SELESAI dan tersimpan
+            // permanen, terlepas dari apapun yang terjadi pada langkah
+            // kirim email di bawah.
             DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
+        // Kirim link reset password: best-effort, DI LUAR transaction.
+        // Kalau provider email gagal (mis. keterbatasan testing Resend,
+        // rate limit, dsb), akun yang SUDAH DIBUAT tidak ikut batal —
+        // admin cukup diberi tau supaya bisa kirim ulang manual nanti
+        // lewat tombol "Kirim Reset Password" yang sudah ada di halaman
+        // detail user.
+        try {
+            \Illuminate\Support\Facades\Password::sendResetLink(['email' => $user->email]);
 
             return redirect()->route('admin.users.index')
                 ->with('message', "Akun untuk {$person->display_name} berhasil dibuat. Link atur password dikirim ke {$user->email}.");
         } catch (\Throwable $e) {
-            DB::rollBack();
-            throw $e;
+            report($e); // tetap masuk Sentry, supaya kegagalan kirim email tetap termonitor
+
+            return redirect()->route('admin.users.index')
+                ->with('message', "Akun untuk {$person->display_name} berhasil dibuat, TAPI link atur password gagal dikirim otomatis ({$e->getMessage()}). Gunakan tombol \"Kirim Reset Password\" di halaman detail user untuk kirim ulang.");
         }
     }
 }
