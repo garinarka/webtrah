@@ -35,7 +35,9 @@ class SecurityHeaders
                 // set style lewat .style() langsung di elemen SVG) dan Vue :style
                 "style-src 'self' 'unsafe-inline' https://fonts.bunny.net",
                 "font-src 'self' https://fonts.bunny.net",
-                "img-src 'self' data:",
+                // blob: dibutuhkan untuk preview hasil crop foto profil
+                // (URL.createObjectURL) sebelum foto benar-benar di-upload
+                "img-src 'self' data: blob:",
                 "connect-src 'self'",
                 "frame-ancestors 'self'",
                 "base-uri 'self'",

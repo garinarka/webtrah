@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
+import { Cropper } from 'vue-advanced-cropper'
+import 'vue-advanced-cropper/dist/style.css'
 
 defineProps({
     mustVerifyEmail: {
@@ -14,31 +16,73 @@ defineProps({
 
 const user = usePage().props.auth.user
 
-// Foto profil
+// ── Foto profil: pilih file -> crop -> preview hasil crop -> simpan ──────
 const avatarInput = ref(null)
-const avatarPreview = ref(null)
+const cropperRef = ref(null)
+const rawImageSrc = ref(null) // gambar asli (belum di-crop), buat modal
+const showCropModal = ref(false)
+const croppedPreview = ref(null) // hasil crop, ditampilkan sebelum disimpan
+const croppedBlob = ref(null) // hasil crop dalam bentuk Blob, siap upload
 const avatarForm = useForm({ avatar: null })
 
 const pickAvatar = () => avatarInput.value?.click()
 
-const onAvatarChange = (e) => {
+const onFileSelected = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    avatarForm.avatar = file
-    avatarPreview.value = URL.createObjectURL(file)
+    const reader = new FileReader()
+    reader.onload = () => {
+        rawImageSrc.value = reader.result
+        showCropModal.value = true
+    }
+    reader.readAsDataURL(file)
 
-    // Langsung upload begitu file dipilih — tidak perlu tombol "simpan"
-    // terpisah, lebih simpel buat user.
+    // reset input biar bisa pilih file yang sama lagi kalau mau ulang crop
+    e.target.value = ''
+}
+
+const confirmCrop = () => {
+    const { canvas } = cropperRef.value.getResult()
+    if (!canvas) return
+
+    canvas.toBlob(
+        (blob) => {
+            croppedBlob.value = blob
+            croppedPreview.value = URL.createObjectURL(blob)
+            showCropModal.value = false
+            rawImageSrc.value = null
+        },
+        'image/jpeg',
+        0.9,
+    )
+}
+
+const cancelCrop = () => {
+    showCropModal.value = false
+    rawImageSrc.value = null
+}
+
+const saveAvatar = () => {
+    if (!croppedBlob.value) return
+
+    avatarForm.avatar = new File([croppedBlob.value], 'avatar.jpg', {
+        type: 'image/jpeg',
+    })
+
     avatarForm.post(route('profile.avatar.update'), {
         preserveScroll: true,
         onSuccess: () => {
-            avatarPreview.value = null // pakai avatar_url baru dari server
-        },
-        onError: () => {
-            avatarPreview.value = null
+            croppedPreview.value = null
+            croppedBlob.value = null
         },
     })
+}
+
+const cancelSave = () => {
+    croppedPreview.value = null
+    croppedBlob.value = null
+    avatarForm.reset()
 }
 
 const deleteAvatarForm = useForm({})
@@ -123,8 +167,8 @@ const deleteAccount = () => {
                 <div class="mt-4 flex items-center gap-5">
                     <div class="relative">
                         <img
-                            v-if="avatarPreview || user.avatar_url"
-                            :src="avatarPreview || user.avatar_url"
+                            v-if="croppedPreview || user.avatar_url"
+                            :src="croppedPreview || user.avatar_url"
                             alt="Foto profil"
                             class="h-20 w-20 rounded-full object-cover ring-2 ring-gray-100"
                         />
@@ -149,24 +193,57 @@ const deleteAccount = () => {
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
                             class="hidden"
-                            @change="onAvatarChange"
+                            @change="onFileSelected"
                         />
-                        <button
-                            type="button"
-                            @click="pickAvatar"
-                            class="block rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
-                            :disabled="avatarForm.processing"
-                        >
-                            {{ user.avatar_url ? 'Ganti Foto' : 'Unggah Foto' }}
-                        </button>
-                        <button
-                            v-if="user.avatar_url && !avatarForm.processing"
-                            type="button"
-                            @click="removeAvatar"
-                            class="block text-sm text-red-600 hover:text-red-700"
-                        >
-                            Hapus Foto
-                        </button>
+
+                        <!-- Belum ada crop pending: tombol pilih foto -->
+                        <template v-if="!croppedPreview">
+                            <button
+                                type="button"
+                                @click="pickAvatar"
+                                class="block rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+                            >
+                                {{
+                                    user.avatar_url
+                                        ? 'Ganti Foto'
+                                        : 'Unggah Foto'
+                                }}
+                            </button>
+                            <button
+                                v-if="user.avatar_url"
+                                type="button"
+                                @click="removeAvatar"
+                                class="block text-sm text-red-600 hover:text-red-700"
+                            >
+                                Hapus Foto
+                            </button>
+                        </template>
+
+                        <!-- Sudah di-crop, belum disimpan: tombol Simpan/Batal eksplisit -->
+                        <template v-else>
+                            <div class="flex gap-2">
+                                <button
+                                    type="button"
+                                    @click="saveAvatar"
+                                    class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+                                    :disabled="avatarForm.processing"
+                                >
+                                    Simpan Foto
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="cancelSave"
+                                    class="rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200"
+                                    :disabled="avatarForm.processing"
+                                >
+                                    Batal
+                                </button>
+                            </div>
+                            <p class="text-xs text-amber-600">
+                                Belum tersimpan — klik "Simpan Foto" dulu.
+                            </p>
+                        </template>
+
                         <p class="text-xs text-gray-500">
                             JPG, PNG, atau WEBP. Maksimal 2MB.
                         </p>
@@ -179,6 +256,51 @@ const deleteAccount = () => {
                     </div>
                 </div>
             </section>
+
+            <!-- Modal Crop Foto -->
+            <div
+                v-if="showCropModal"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            >
+                <div class="w-full max-w-lg rounded-lg bg-white shadow-xl">
+                    <div class="border-b border-gray-100 p-4">
+                        <h3 class="font-medium text-gray-900">
+                            Sesuaikan Foto
+                        </h3>
+                        <p class="mt-0.5 text-xs text-gray-500">
+                            Geser & perbesar/perkecil area lingkaran.
+                        </p>
+                    </div>
+
+                    <div class="p-4">
+                        <Cropper
+                            ref="cropperRef"
+                            :src="rawImageSrc"
+                            :stencil-props="{ aspectRatio: 1 }"
+                            class="h-72 overflow-hidden rounded-md bg-gray-50"
+                        />
+                    </div>
+
+                    <div
+                        class="flex justify-end gap-2 border-t border-gray-100 p-4"
+                    >
+                        <button
+                            type="button"
+                            @click="cancelCrop"
+                            class="rounded-md bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            type="button"
+                            @click="confirmCrop"
+                            class="rounded-md bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700"
+                        >
+                            Pakai Foto Ini
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Info Profil -->
             <section class="rounded-lg bg-white p-6 shadow">
