@@ -34,9 +34,10 @@ class UpdatePersonRequest extends FormRequest
             ],
             'death_accuracy' => ['required', 'in:exact,year_month,year,unknown'],
             'family_unit_id' => ['nullable', 'exists:family_units,id'],
+            'is_draft' => ['boolean'],
             // Admin langsung save → edit_reason tidak wajib
-            // Moderator & user → wajib karena masuk approval queue
-            'edit_reason' => $isAdmin
+            // Moderator & user → wajib karena masuk approval queue, KECUALI simpan draft
+            'edit_reason' => $isAdmin || $this->boolean('is_draft')
                 ? ['nullable', 'string', 'max:500']
                 : ['required', 'string', 'min:5', 'max:500'],
         ];
@@ -60,6 +61,7 @@ class UpdatePersonRequest extends FormRequest
         $this->merge([
             'birth_date' => $this->normalizeDateInput($this->birth_date, $this->birth_accuracy),
             'death_date' => $this->normalizeDateInput($this->death_date, $this->death_accuracy),
+            'is_draft' => $this->boolean('is_draft', false),
         ]);
     }
 
