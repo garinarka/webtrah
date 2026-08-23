@@ -8,6 +8,7 @@ use App\Models\Person;
 use App\Models\Relationship;
 use App\Models\SpouseUnit;
 use App\Services\NotificationService;
+use App\Services\RelationshipValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,8 +27,6 @@ class RelationshipController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', Relationship::class);
-
         $data = $request->validate([
             'person_id' => ['required', 'exists:people,id'],
             'related_id' => ['required', 'exists:people,id', 'different:person_id'],
@@ -43,6 +42,12 @@ class RelationshipController extends Controller
         $relatedId = $data['related_id'];
         $type = $data['type'];
 
+        $person = Person::findOrFail($personId);
+        $related = Person::findOrFail($relatedId);
+
+        // Otorisasi: scope ke unit keluarga person, SAMA seperti PersonPolicy::update().
+        $this->authorize('create', [Relationship::class, $person]);
+
         [$subjectId, $objectId, $storedType] = match ($type) {
             'parent', 'step_parent', 'adopted_parent' => [$relatedId, $personId, $type],
             'child', 'step_child', 'adopted_child' => [$personId, $relatedId, match ($type) {
@@ -52,6 +57,9 @@ class RelationshipController extends Controller
             }],
             default => [$personId, $relatedId, 'spouse'],
         };
+
+        // Validasi bersama: same family unit + single active spouse.
+        RelationshipValidator::assertValid($person, $related, $storedType, $subjectId, $objectId);
 
         // Cek duplikat
         $exists = Relationship::where('subject_id', $subjectId)

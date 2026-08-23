@@ -2,14 +2,34 @@
 
 namespace App\Policies;
 
+use App\Models\Person;
 use App\Models\Relationship;
 use App\Models\User;
 
 class RelationshipPolicy
 {
-    public function create(User $user): bool
+    /**
+     * Otorisasi buat relasi, di-scope SAMA seperti PersonPolicy::update():
+     * admin bebas, moderator hanya untuk unit yang dia-assign, user biasa tidak boleh.
+     *
+     * $person = anchor person (person_id dari request) — relasi hanya boleh dibuat
+     * antar anggota SATU unit keluarga (lihat RelationshipValidator), jadi cukup cek
+     * unit dari anchor person ini.
+     */
+    public function create(User $user, ?Person $person = null): bool
     {
-        return $user->isAdmin() || $user->isModerator();
+        if ($user->isAdmin()) {
+            return true;
+        }
+        if ($user->isModerator()) {
+            if (! $person) {
+                return false;
+            }
+
+            return $user->managesUnit($person->family_unit_id);
+        }
+
+        return false;
     }
 
     public function approve(User $user, Relationship $relationship): bool

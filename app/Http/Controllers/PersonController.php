@@ -159,7 +159,7 @@ class PersonController extends Controller
             'can' => [
                 'edit' => $user->can('update', $person),
                 'delete' => $user->can('delete', $person),
-                'manage_relations' => $user->isAdmin() || $user->isModerator(),
+                'manage_relations' => $user->can('create', [\App\Models\Relationship::class, $person]),
                 'approve_relations' => $user->isAdmin(),
                 // Tombol batalkan pengajuan: muncul jika ada approval pending milik user ini
                 'cancel_approval' => $pendingApproval !== null,
@@ -278,18 +278,31 @@ class PersonController extends Controller
                         ->whereNull('ended_at')
                         ->exists();
 
-                    if (! $exists) {
-                        \App\Models\Relationship::create([
-                            'subject_id' => $subjectId,
-                            'object_id' => $objectId,
-                            'type' => $storedType,
-                            'is_biological' => $rel['is_biological'] ?? true,
-                            'status' => 'approved',
-                            'approved_by' => $user->id,
-                            'approved_at' => now(),
-                            'created_by' => $user->id,
-                        ]);
+                    if ($exists) {
+                        continue;
                     }
+
+                    // Validasi bersama: same family unit + single active spouse.
+                    // Wizard step 3 dijalankan dalam transaction yang sama dengan Person::create(),
+                    // jadi kalau ini gagal, seluruh proses create person ikut di-rollback.
+                    \App\Services\RelationshipValidator::assertValid(
+                        $person,
+                        Person::findOrFail($relatedId),
+                        $storedType,
+                        $subjectId,
+                        $objectId
+                    );
+
+                    \App\Models\Relationship::create([
+                        'subject_id' => $subjectId,
+                        'object_id' => $objectId,
+                        'type' => $storedType,
+                        'is_biological' => $rel['is_biological'] ?? true,
+                        'status' => 'approved',
+                        'approved_by' => $user->id,
+                        'approved_at' => now(),
+                        'created_by' => $user->id,
+                    ]);
                 }
             }
 
