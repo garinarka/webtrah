@@ -494,9 +494,13 @@ class PersonController extends Controller
             $oldValues = $person->toArray();
 
             if ($user->isAdmin()) {
+                // Opsi A: cascade — akhiri otomatis relasi pasangan aktif SEBELUM person dihapus.
+                $endedRelIds = \App\Services\RelationshipValidator::cascadeEndSpouseRelationships($person);
+
                 AuditLog::record($person, 'deleted', $oldValues, [
                     'deleted_by' => $user->name,
                     'reason' => $request->reason,
+                    'cascaded_spouse_relationship_ids' => $endedRelIds,
                 ]);
                 $person->delete();
                 DB::commit();
@@ -546,8 +550,11 @@ class PersonController extends Controller
                 }
 
                 if ($user->isAdmin()) {
+                    $endedRelIds = \App\Services\RelationshipValidator::cascadeEndSpouseRelationships($person);
+
                     AuditLog::record($person, 'deleted', $person->toArray(), [
                         'deleted_by' => $user->name, 'reason' => $request->reason, 'bulk' => true,
+                        'cascaded_spouse_relationship_ids' => $endedRelIds,
                     ]);
                     $person->delete();
                     $deleted++;

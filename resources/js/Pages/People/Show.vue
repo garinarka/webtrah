@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AppLayout from '@/layouts/AppLayout.vue'
 import RelationshipsPanel from '@/Pages/People/Partials/RelationshipsPanel.vue'
@@ -98,9 +98,20 @@ const genderLabel = (gender) =>
 const showDeleteModal = ref(false)
 const deleteReason = ref('')
 const deleteProcessing = ref(false)
+const cascadeAck = ref(false)
+
+// Relasi pasangan aktif yang akan ikut diakhiri otomatis (Opsi A: cascade)
+const activeSpouses = computed(() => props.relationships?.spouses ?? [])
+const hasActiveSpouses = computed(() => activeSpouses.value.length > 0)
+
+const canSubmitDelete = computed(
+    () =>
+        deleteReason.value.length >= 5 &&
+        (!hasActiveSpouses.value || cascadeAck.value),
+)
 
 const submitDelete = () => {
-    if (deleteReason.value.length < 5) return
+    if (!canSubmitDelete.value) return
     deleteProcessing.value = true
     router.delete(`/people/${props.person.id}`, {
         data: { reason: deleteReason.value },
@@ -567,6 +578,44 @@ const eventColor = (event) =>
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-300"
                                 />
                             </div>
+
+                            <!-- Peringatan cascade: relasi pasangan aktif akan ikut diakhiri -->
+                            <div
+                                v-if="hasActiveSpouses"
+                                class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3"
+                            >
+                                <p class="text-xs font-semibold text-amber-800">
+                                    ⚠ {{ person.display_name }} masih punya
+                                    {{ activeSpouses.length }} relasi pasangan
+                                    aktif. Relasi berikut akan
+                                    <span class="underline"
+                                        >otomatis diakhiri</span
+                                    >
+                                    bersamaan dengan penghapusan ini:
+                                </p>
+                                <ul
+                                    class="mt-2 space-y-1 text-xs text-amber-700"
+                                >
+                                    <li
+                                        v-for="s in activeSpouses"
+                                        :key="s.id"
+                                        class="flex items-center gap-1"
+                                    >
+                                        • {{ s.person?.display_name ?? '-' }}
+                                    </li>
+                                </ul>
+                                <label
+                                    class="mt-3 flex cursor-pointer items-start gap-2 text-xs text-amber-900"
+                                >
+                                    <input
+                                        v-model="cascadeAck"
+                                        type="checkbox"
+                                        class="mt-0.5 h-3.5 w-3.5 rounded border-amber-400 text-amber-600 focus:ring-amber-400"
+                                    />
+                                    Saya paham dan setuju relasi pasangan di
+                                    atas akan diakhiri secara otomatis.
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-5 flex justify-end gap-3">
@@ -578,9 +627,7 @@ const eventColor = (event) =>
                         </button>
                         <button
                             @click="submitDelete"
-                            :disabled="
-                                deleteReason.length < 5 || deleteProcessing
-                            "
+                            :disabled="!canSubmitDelete || deleteProcessing"
                             class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                         >
                             {{

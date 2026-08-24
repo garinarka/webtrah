@@ -149,6 +149,10 @@ class ApprovalController extends Controller
             }
 
         } elseif ($approval->action === 'delete') {
+            if ($approval->approvable) {
+                // Opsi A: cascade — akhiri otomatis relasi pasangan aktif SEBELUM person dihapus.
+                \App\Services\RelationshipValidator::cascadeEndSpouseRelationships($approval->approvable);
+            }
             $approval->approvable?->delete();
 
         } elseif ($approval->action === 'resign_moderator') {

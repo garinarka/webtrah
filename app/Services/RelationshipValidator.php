@@ -58,7 +58,43 @@ class RelationshipValidator
     }
 
     /**
-     * Jalankan kedua validasi sekaligus. Lempar ValidationException jika salah satu gagal.
+     * Opsi A (cascade): akhiri otomatis semua relasi pasangan AKTIF milik $person
+     * saat person tsb dihapus. Dipanggil di titik final penghapusan person:
+     * - PersonController::destroy() (admin, langsung)
+     * - PersonController::bulkDestroy() (admin, langsung)
+     * - ApprovalController::approve() saat action 'delete' disetujui (moderator)
+     *
+     * "Aktif" = type spouse, status approved/pending, ended_at masih null.
+     * Reason dicatat 'disownment' (nilai enum yang sama dipakai utk pemutusan
+     * paksa non-alami lain di sistem, lihat ApprovalController::approve()
+     * action 'delete_relation').
+     *
+     * @return array<string> ID relasi yang diakhiri (untuk AuditLog)
+     */
+    public static function cascadeEndSpouseRelationships(Person $person): array
+    {
+        $relationships = Relationship::where('type', 'spouse')
+            ->where(function ($q) use ($person) {
+                $q->where('subject_id', $person->id)->orWhere('object_id', $person->id);
+            })
+            ->whereIn('status', ['approved', 'pending'])
+            ->whereNull('ended_at')
+            ->get();
+
+        $ids = [];
+        foreach ($relationships as $rel) {
+            $rel->update([
+                'ended_at' => now()->toDateString(),
+                'ended_reason' => 'disownment',
+            ]);
+            $ids[] = $rel->id;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Jalankan kedua validasi pembuatan relasi sekaligus. Lempar ValidationException jika salah satu gagal.
      */
     public static function assertValid(Person $subject, Person $object, string $type, string $subjectId, string $objectId): void
     {

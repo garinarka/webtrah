@@ -748,6 +748,13 @@ const formatYear = (dateStr) => {
                             <p class="mt-1 text-sm text-gray-500">
                                 Semua data yang dipilih akan dihapus permanen.
                             </p>
+                            <p
+                                class="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-700 ring-1 ring-amber-200"
+                            >
+                                ⚠ Jika ada anggota terpilih yang masih punya
+                                relasi pasangan aktif, relasi tersebut akan ikut
+                                diakhiri otomatis.
+                            </p>
                             <div class="mt-4">
                                 <label
                                     class="mb-1 block text-xs font-medium text-gray-700"
