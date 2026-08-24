@@ -98,11 +98,24 @@ class ApprovalController extends Controller
         if ($approval->action === 'create') {
             $updateData = ['status' => 'active'];
             foreach ($approval->changes ?? [] as $field => $values) {
+                if ($field === 'relationship_ids') {
+                    continue; // ditangani terpisah di bawah, bukan field Person
+                }
                 if (isset($values['new']) && ! in_array($field, ['status', 'created_by'])) {
                     $updateData[$field] = $values['new'];
                 }
             }
             $approval->approvable?->update($updateData);
+
+            // Aktifkan relasi yang di-set bersamaan di wizard step 3 (lihat PersonController::store()).
+            $relationshipIds = $approval->changes['relationship_ids']['new'] ?? [];
+            if (! empty($relationshipIds)) {
+                \App\Models\Relationship::whereIn('id', $relationshipIds)->update([
+                    'status' => 'approved',
+                    'approved_by' => auth()->id(),
+                    'approved_at' => now(),
+                ]);
+            }
 
         } elseif ($approval->action === 'update') {
             if ($approval->approvable) {
@@ -200,6 +213,13 @@ class ApprovalController extends Controller
         DB::beginTransaction();
         try {
             if ($approval->action === 'create') {
+                // Hapus relasi pending yang di-set bersamaan di wizard step 3 (jika ada)
+                // SEBELUM person-nya dihapus, supaya tidak ada relasi menggantung.
+                $relationshipIds = $approval->changes['relationship_ids']['new'] ?? [];
+                if (! empty($relationshipIds)) {
+                    \App\Models\Relationship::whereIn('id', $relationshipIds)->delete();
+                }
+
                 // Hapus person yang masih pending (belum aktif)
                 $approval->approvable?->delete();
             }
@@ -232,6 +252,20 @@ class ApprovalController extends Controller
             'rejection_reason' => $request->reason,
         ]);
 
+        // Kalau pengajuan 'create' ditolak dan ada relasi yang di-set bersamaan di
+        // wizard step 3, relasi pending itu ikut dibatalkan (bukan diaktifkan)
+        // supaya tidak menggantung menunjuk ke person yang tidak pernah aktif.
+        if ($approval->action === 'create') {
+            $relationshipIds = $approval->changes['relationship_ids']['new'] ?? [];
+            if (! empty($relationshipIds)) {
+                \App\Models\Relationship::whereIn('id', $relationshipIds)->update([
+                    'status' => 'rejected',
+                    'ended_at' => now()->toDateString(),
+                    'ended_reason' => 'disownment',
+                ]);
+            }
+        }
+
         $requester = $approval->requester;
         if ($requester) {
             $requester->notify(new ApprovalDecided($approval->fresh(['approvable', 'approver']), 'rejected', $request->reason));
@@ -245,6 +279,9 @@ class ApprovalController extends Controller
     {
         $diff = [];
         foreach ($approval->changes ?? [] as $field => $values) {
+            if ($field === 'relationship_ids') {
+                continue; // ditampilkan terpisah, bukan sebagai diff field biasa
+            }
             $diff[] = [
                 'field' => $field,
                 'label' => $this->fieldLabel($field),

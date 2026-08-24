@@ -231,29 +231,15 @@ class PersonController extends Controller
                 'display_name' => $data['display_name'],
             ]);
 
-            if (! $user->isAdmin() && ! $isDraft) {
-                $approval = Approval::create([
-                    'approvable_type' => Person::class,
-                    'approvable_id' => $person->id,
-                    'action' => 'create',
-                    'changes' => [
-                        'display_name' => ['old' => null, 'new' => $data['display_name']],
-                        'gender' => ['old' => null, 'new' => $data['gender']],
-                        'birth_date' => ['old' => null, 'new' => $data['birth_date']],
-                        'birth_accuracy' => ['old' => null, 'new' => $data['birth_accuracy']],
-                        'death_date' => ['old' => null, 'new' => $data['death_date']],
-                        'death_accuracy' => ['old' => null, 'new' => $data['death_accuracy']],
-                    ],
-                    'status' => 'pending',
-                    'requested_by' => $user->id,
-                ]);
-                NotificationService::notifyAdminsOfNewApproval($approval->load(['approvable', 'requester']));
-            }
-
-            // Buat relasi awal bila ada (hanya untuk admin, langsung approved)
-            // Non-admin: relasi diabaikan — relasi bisa ditambah setelah approved
+            // Buat relasi awal bila ada. Admin → langsung approved.
+            // Moderator → dibuat status 'pending', ID-nya dicatat di Approval::changes
+            // (key 'relationship_ids') supaya ikut diaktifkan saat admin approve
+            // person-nya (lihat ApprovalController::approve()). Dijalankan SEBELUM
+            // Approval::create() di bawah, dan tetap di transaction yang sama dengan
+            // Person::create() — kalau validasi relasi gagal, semuanya rollback.
             $initialRelations = $request->input('initial_relations', []);
-            if ($user->isAdmin() && ! $isDraft && ! empty($initialRelations)) {
+            $createdRelationshipIds = [];
+            if (! $isDraft && ! empty($initialRelations)) {
                 foreach ($initialRelations as $rel) {
                     $relatedId = $rel['related_id'] ?? null;
                     $type = $rel['type'] ?? null;
@@ -283,8 +269,6 @@ class PersonController extends Controller
                     }
 
                     // Validasi bersama: same family unit + single active spouse.
-                    // Wizard step 3 dijalankan dalam transaction yang sama dengan Person::create(),
-                    // jadi kalau ini gagal, seluruh proses create person ikut di-rollback.
                     \App\Services\RelationshipValidator::assertValid(
                         $person,
                         Person::findOrFail($relatedId),
@@ -293,17 +277,48 @@ class PersonController extends Controller
                         $objectId
                     );
 
-                    \App\Models\Relationship::create([
+                    $isAdminNow = $user->isAdmin();
+                    $relationship = \App\Models\Relationship::create([
                         'subject_id' => $subjectId,
                         'object_id' => $objectId,
                         'type' => $storedType,
                         'is_biological' => $rel['is_biological'] ?? true,
-                        'status' => 'approved',
-                        'approved_by' => $user->id,
-                        'approved_at' => now(),
+                        'status' => $isAdminNow ? 'approved' : 'pending',
+                        'approved_by' => $isAdminNow ? $user->id : null,
+                        'approved_at' => $isAdminNow ? now() : null,
                         'created_by' => $user->id,
                     ]);
+
+                    if (! $isAdminNow) {
+                        $createdRelationshipIds[] = $relationship->id;
+                    }
                 }
+            }
+
+            if (! $user->isAdmin() && ! $isDraft) {
+                $changes = [
+                    'display_name' => ['old' => null, 'new' => $data['display_name']],
+                    'gender' => ['old' => null, 'new' => $data['gender']],
+                    'birth_date' => ['old' => null, 'new' => $data['birth_date']],
+                    'birth_accuracy' => ['old' => null, 'new' => $data['birth_accuracy']],
+                    'death_date' => ['old' => null, 'new' => $data['death_date']],
+                    'death_accuracy' => ['old' => null, 'new' => $data['death_accuracy']],
+                ];
+
+                // Sertakan relasi step 3 (jika ada) supaya ikut diaktifkan saat approve.
+                if (! empty($createdRelationshipIds)) {
+                    $changes['relationship_ids'] = ['old' => null, 'new' => $createdRelationshipIds];
+                }
+
+                $approval = Approval::create([
+                    'approvable_type' => Person::class,
+                    'approvable_id' => $person->id,
+                    'action' => 'create',
+                    'changes' => $changes,
+                    'status' => 'pending',
+                    'requested_by' => $user->id,
+                ]);
+                NotificationService::notifyAdminsOfNewApproval($approval->load(['approvable', 'requester']));
             }
 
             AuditLog::record($person, $isDraft ? 'draft_saved' : 'created', [], [
